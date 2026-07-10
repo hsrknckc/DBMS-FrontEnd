@@ -1,0 +1,10 @@
+D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/INSTALL.dir
+D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/ALL_BUILD.dir
+D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/ZERO_CHECK.dir
+D:/DBMS-FrontEnd/build/windows/x64/flutter/CMakeFiles/flutter_wrapper_plugin.dir
+D:/DBMS-FrontEnd/build/windows/x64/flutter/CMakeFiles/flutter_wrapper_app.dir
+D:/DBMS-FrontEnd/build/windows/x64/flutter/CMakeFiles/flutter_assemble.dir
+D:/DBMS-FrontEnd/build/windows/x64/flutter/CMakeFiles/INSTALL.dir
+D:/DBMS-FrontEnd/build/windows/x64/runner/CMakeFiles/dmbs_frontend.dir
+D:/DBMS-FrontEnd/build/windows/x64/runner/CMakeFiles/INSTALL.dir
+D:/DBMS-FrontEnd/build/windows/x64/runner/CMakeFiles/ALL_BUILD.dir

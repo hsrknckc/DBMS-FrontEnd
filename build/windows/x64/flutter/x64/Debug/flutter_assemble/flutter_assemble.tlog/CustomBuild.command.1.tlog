@@ -1,0 +1,28 @@
+^D:\DBMS-FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\F880ABF82EA99D88C98EDE54165B0A16\FLUTTER_WINDOWS.DLL.RULE
+setlocal
+"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\iremb\Dev\flutter PROJECT_DIR=D:\DBMS-FrontEnd FLUTTER_ROOT=C:\Users\iremb\Dev\flutter FLUTTER_EPHEMERAL_DIR=D:\DBMS-FrontEnd\windows\flutter\ephemeral PROJECT_DIR=D:\DBMS-FrontEnd FLUTTER_TARGET=D:\DBMS-FrontEnd\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDQuNg==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049ZWU4MGYwOGJiZg==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ODM2NzVlZDI3Ng==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMi4y DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=D:\DBMS-FrontEnd\.dart_tool\package_config.json C:/Users/iremb/Dev/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\DBMS-FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\22ACF39D096F3E362612C4DD852FB03A\FLUTTER_ASSEMBLE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\DBMS-FRONTEND\WINDOWS\FLUTTER\CMAKELISTS.TXT
+setlocal
+"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SD:/DBMS-FrontEnd/windows -BD:/DBMS-FrontEnd/build/windows/x64 --check-stamp-file D:/DBMS-FrontEnd/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
