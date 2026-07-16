@@ -10,6 +10,7 @@ import 'app_top_bar.dart';
 import '../features/permissions/permissions_page.dart';
 import '../features/audit_logs/audit_log_page.dart';
 import '../features/databases/databases_page.dart';
+import '../features/data_explorer/data_explorer_page.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -122,13 +123,10 @@ class _MainLayoutState extends State<MainLayout> {
         return DatabasesPage(currentUser: _currentUser);
 
       case AppPage.dataExplorer:
-        return const PlaceholderPage(
-          title: 'Data Explorer',
-          description:
-              'Veriler Excel benzeri bir tablo üzerinde burada görüntülenecek.',
-          icon: Icons.table_chart_outlined,
+        return DataExplorerPage(
+        currentUser: _currentUser,
         );
-
+        
       case AppPage.users:
         return const UsersPage();
 
