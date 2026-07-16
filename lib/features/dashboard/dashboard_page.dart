@@ -40,11 +40,7 @@ class DashboardPage extends StatelessWidget {
             ],
           ),
         ),
-        ElevatedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.add),
-          label: const Text('Yeni Database'),
-        ),
+        
       ],
     );
   }

@@ -1066,6 +1066,9 @@ class _PermissionsPageState extends State<PermissionsPage> {
 
       case Permission.dataExport:
         return 'Kullanıcı verileri CSV, JSON veya Excel olarak dışa aktarabilir.';
+      
+      case Permission.dataImport:
+        return 'Kullanıcı verileri CSV, JSON veya Excel olarak içe aktarabilir.';     
     }
   }
 }
