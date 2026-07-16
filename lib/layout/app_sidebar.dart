@@ -38,9 +38,9 @@ class AppSidebar extends StatelessWidget {
       page: AppPage.users,
     ),
     NavigationItem(
-      title: 'Roles & Permissions',
+      title: 'Permissions',
       icon: Icons.admin_panel_settings_outlined,
-      page: AppPage.rolesPermissions,
+      page: AppPage.permissions,
     ),
     NavigationItem(
       title: 'Audit Logs',
@@ -78,7 +78,11 @@ class AppSidebar extends StatelessWidget {
   ];
 
   List<NavigationItem> get navigationItems {
-    return currentUser.isSuperAdmin ? superAdminItems : userItems;
+    if (currentUser.isSuperAdmin) {
+      return superAdminItems;
+    }
+
+    return userItems;
   }
 
   @override

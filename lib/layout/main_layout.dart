@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../features/users/users_page.dart';
 import '../core/widgets/placeholder_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../models/app_user.dart';
@@ -7,6 +7,9 @@ import '../models/navigation_item.dart';
 import '../models/permission.dart';
 import 'app_sidebar.dart';
 import 'app_top_bar.dart';
+import '../features/permissions/permissions_page.dart';
+import '../features/audit_logs/audit_log_page.dart';
+import '../features/databases/databases_page.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,6 +20,9 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   AppPage _selectedPage = AppPage.dashboard;
+
+  /// false yapılırsa uygulama User olarak başlar.
+  /// true yapılırsa Super Admin olarak başlar.
   bool _showSuperAdmin = true;
 
   AppUser get _currentUser {
@@ -25,27 +31,29 @@ class _MainLayoutState extends State<MainLayout> {
         id: 'super-admin-1',
         name: 'Ayşe Yılmaz',
         email: 'ayse@company.com',
-        department: 'System Management',
         role: UserRole.superAdmin,
+        departments: const {},
         permissions: Permission.values.toSet(),
         isActive: true,
-        lastLoginAt: DateTime(2026, 7, 10, 9, 12),
-        lastLogoutAt: DateTime(2026, 7, 9, 17, 48),
+        lastLoginAt: DateTime(2026, 7, 15, 9, 12),
+        lastLogoutAt: DateTime(2026, 7, 14, 17, 48),
       );
     }
 
-    return const AppUser(
+    return AppUser(
       id: 'user-1',
       name: 'Mehmet Kaya',
       email: 'mehmet@company.com',
-      department: 'Sensor',
       role: UserRole.user,
-      permissions: {
+      departments: const {'Sensor', 'Signal'},
+      permissions: const {
         Permission.databaseView,
         Permission.dataView,
         Permission.dataExport,
       },
-      isActive: false,
+      isActive: true,
+      lastLoginAt: DateTime(2026, 7, 15, 8, 45),
+      lastLogoutAt: DateTime(2026, 7, 14, 17, 20),
     );
   }
 
@@ -73,7 +81,7 @@ class _MainLayoutState extends State<MainLayout> {
 
     const restrictedPages = {
       AppPage.users,
-      AppPage.rolesPermissions,
+      AppPage.permissions,
       AppPage.auditLogs,
     };
 
@@ -94,8 +102,8 @@ class _MainLayoutState extends State<MainLayout> {
       case AppPage.users:
         return 'Users';
 
-      case AppPage.rolesPermissions:
-        return 'Roles & Permissions';
+      case AppPage.permissions:
+        return 'Permissions';
 
       case AppPage.auditLogs:
         return 'Audit Logs';
@@ -111,12 +119,7 @@ class _MainLayoutState extends State<MainLayout> {
         return const DashboardPage();
 
       case AppPage.databases:
-        return const PlaceholderPage(
-          title: 'Databases',
-          description:
-              'Database oluşturma, görüntüleme ve yönetim işlemleri burada yapılacak.',
-          icon: Icons.storage_outlined,
-        );
+        return DatabasesPage(currentUser: _currentUser);
 
       case AppPage.dataExplorer:
         return const PlaceholderPage(
@@ -127,34 +130,18 @@ class _MainLayoutState extends State<MainLayout> {
         );
 
       case AppPage.users:
-        return const PlaceholderPage(
-          title: 'Users',
-          description:
-              'Kullanıcı bilgileri, durumları, son giriş ve çıkış zamanları burada gösterilecek.',
-          icon: Icons.people_outline,
-        );
+        return const UsersPage();
 
-      case AppPage.rolesPermissions:
-        return const PlaceholderPage(
-          title: 'Roles & Permissions',
-          description:
-              'Super Admin, kullanıcıların yetkilerini burada seçerek düzenleyecek.',
-          icon: Icons.admin_panel_settings_outlined,
-        );
+      case AppPage.permissions:
+        return const PermissionsPage();
 
       case AppPage.auditLogs:
-        return const PlaceholderPage(
-          title: 'Audit Logs',
-          description:
-              'Kullanıcı ve sistem hareketleri burada görüntülenecek.',
-          icon: Icons.history_outlined,
-        );
+        return const AuditLogsPage();
 
       case AppPage.settings:
         return const PlaceholderPage(
           title: 'Settings',
-          description:
-              'Hesap ve uygulama ayarları burada yönetilecek.',
+          description: 'Hesap ve uygulama ayarları burada yönetilecek.',
           icon: Icons.settings_outlined,
         );
     }

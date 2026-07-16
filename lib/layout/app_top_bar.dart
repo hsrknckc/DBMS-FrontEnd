@@ -59,8 +59,6 @@ class AppTopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 18),
-
-          // Bu bölüm sadece geliştirme sırasında test için kullanılıyor.
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 10,

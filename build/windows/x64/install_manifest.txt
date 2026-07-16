@@ -1,6 +1,5 @@
 D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/data/icudtl.dat
 D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/flutter_windows.dll
-D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/native_assets.json
 D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/data/flutter_assets/AssetManifest.bin
 D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/data/flutter_assets/FontManifest.json
 D:/DBMS-FrontEnd/build/windows/x64/runner/Debug/data/flutter_assets/fonts/MaterialIcons-Regular.otf

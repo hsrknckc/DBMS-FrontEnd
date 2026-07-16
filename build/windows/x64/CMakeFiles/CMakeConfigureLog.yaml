@@ -24,7 +24,7 @@ events:
       The output was:
       0
       .NET Framework i├ğin MSBuild s├╝r├╝m 17.12.12+1cce77968
-      Olu┼şturma ba┼şlat─▒ld─▒: 10.07.2026 12:26:48.
+      Olu┼şturma ba┼şlat─▒ld─▒: 15.07.2026 14:08:09.
       
       1 d├╝─ş├╝m├╝nde "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\3.29.5-msvc4\\CompilerIdCXX\\CompilerIdCXX.vcxproj" projesi (varsay─▒lan hedefler).
       PrepareForBuild:
@@ -53,7 +53,7 @@ events:
           0 Uyar─▒
           0 Hata
       
-      Ge├ğen S├╝re 00:00:05.12
+      Ge├ğen S├╝re 00:00:04.33
       
       
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
@@ -72,8 +72,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-uphl51"
-      binary: "D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-uphl51"
+      source: "D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-8hh43s"
+      binary: "D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-8hh43s"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /W3 /GR /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -83,40 +83,40 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-uphl51'
+        Change Dir: 'D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-8hh43s'
         
-        Run Build Command(s): "D:/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_6b153.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "D:/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_a64c2.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         .NET Framework i├ğin MSBuild s├╝r├╝m 17.12.12+1cce77968
-        Olu┼şturma ba┼şlat─▒ld─▒: 10.07.2026 12:26:54.
+        Olu┼şturma ba┼şlat─▒ld─▒: 15.07.2026 14:08:15.
         
-        1 d├╝─ş├╝m├╝nde "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-uphl51\\cmTC_6b153.vcxproj" projesi (varsay─▒lan hedefler).
+        1 d├╝─ş├╝m├╝nde "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-8hh43s\\cmTC_a64c2.vcxproj" projesi (varsay─▒lan hedefler).
         PrepareForBuild:
-          "cmTC_6b153.dir\\Debug\\" dizini olu┼şturuluyor.
+          "cmTC_a64c2.dir\\Debug\\" dizini olu┼şturuluyor.
           Yap─▒land─▒r─▒lm─▒┼ş ├ğ─▒k─▒┼ş etkinle┼ştirildi. Derleyici tan─▒lamas─▒n─▒n bi├ğimlendirmesi hata hiyerar┼şisini yans─▒t─▒r. Daha fazla ayr─▒nt─▒ i├ğin bkz. https://aka.ms/cpp/structured-output.
-          "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-uphl51\\Debug\\" dizini olu┼şturuluyor.
-          "cmTC_6b153.dir\\Debug\\cmTC_6b153.tlog\\" dizini olu┼şturuluyor.
+          "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-8hh43s\\Debug\\" dizini olu┼şturuluyor.
+          "cmTC_a64c2.dir\\Debug\\cmTC_a64c2.tlog\\" dizini olu┼şturuluyor.
         InitializeBuildStatus:
-          "AlwaysCreate" belirtildi─şi i├ğin "cmTC_6b153.dir\\Debug\\cmTC_6b153.tlog\\unsuccessfulbuild" olu┼şturuluyor.
-          "cmTC_6b153.dir\\Debug\\cmTC_6b153.tlog\\unsuccessfulbuild" ├Â─şesine eri┼şiliyor.
+          "AlwaysCreate" belirtildi─şi i├ğin "cmTC_a64c2.dir\\Debug\\cmTC_a64c2.tlog\\unsuccessfulbuild" olu┼şturuluyor.
+          "cmTC_a64c2.dir\\Debug\\cmTC_a64c2.tlog\\unsuccessfulbuild" ├Â─şesine eri┼şiliyor.
         ClCompile:
-          D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.42.34433\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_6b153.dir\\Debug\\\\" /Fd"cmTC_6b153.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "D:\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.29\\Modules\\CMakeCXXCompilerABI.cpp"
+          D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.42.34433\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_a64c2.dir\\Debug\\\\" /Fd"cmTC_a64c2.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "D:\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.29\\Modules\\CMakeCXXCompilerABI.cpp"
           x64 i├ğin Microsoft (R) C/C++ ─░yile┼ştirmeli Derleyicisi S├╝r├╝m 19.42.34435
           Telif Hakk─▒ (C) Microsoft Corporation. T├╝m haklar─▒ sakl─▒d─▒r.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_6b153.dir\\Debug\\\\" /Fd"cmTC_6b153.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "D:\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.29\\Modules\\CMakeCXXCompilerABI.cpp"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_a64c2.dir\\Debug\\\\" /Fd"cmTC_a64c2.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "D:\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.29\\Modules\\CMakeCXXCompilerABI.cpp"
           CMakeCXXCompilerABI.cpp
         Link:
-          D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.42.34433\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-uphl51\\Debug\\cmTC_6b153.exe" /INCREMENTAL /ILK:"cmTC_6b153.dir\\Debug\\cmTC_6b153.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-uphl51/Debug/cmTC_6b153.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-uphl51/Debug/cmTC_6b153.lib" /MACHINE:X64  /machine:x64 cmTC_6b153.dir\\Debug\\CMakeCXXCompilerABI.obj
-          cmTC_6b153.vcxproj -> D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-uphl51\\Debug\\cmTC_6b153.exe
+          D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.42.34433\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-8hh43s\\Debug\\cmTC_a64c2.exe" /INCREMENTAL /ILK:"cmTC_a64c2.dir\\Debug\\cmTC_a64c2.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-8hh43s/Debug/cmTC_a64c2.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:/DBMS-FrontEnd/build/windows/x64/CMakeFiles/CMakeScratch/TryCompile-8hh43s/Debug/cmTC_a64c2.lib" /MACHINE:X64  /machine:x64 cmTC_a64c2.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_a64c2.vcxproj -> D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-8hh43s\\Debug\\cmTC_a64c2.exe
         FinalizeBuildStatus:
-          "cmTC_6b153.dir\\Debug\\cmTC_6b153.tlog\\unsuccessfulbuild" dosyas─▒ siliniyor.
-          "cmTC_6b153.dir\\Debug\\cmTC_6b153.tlog\\cmTC_6b153.lastbuildstate" ├Â─şesine eri┼şiliyor.
-        "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-uphl51\\cmTC_6b153.vcxproj" Projesini Olu┼şturma ─░┼şlemi Tamamland─▒ (varsay─▒lan hedefler).
+          "cmTC_a64c2.dir\\Debug\\cmTC_a64c2.tlog\\unsuccessfulbuild" dosyas─▒ siliniyor.
+          "cmTC_a64c2.dir\\Debug\\cmTC_a64c2.tlog\\cmTC_a64c2.lastbuildstate" ├Â─şesine eri┼şiliyor.
+        "D:\\DBMS-FrontEnd\\build\\windows\\x64\\CMakeFiles\\CMakeScratch\\TryCompile-8hh43s\\cmTC_a64c2.vcxproj" Projesini Olu┼şturma ─░┼şlemi Tamamland─▒ (varsay─▒lan hedefler).
         
         Olu┼şturma ba┼şar─▒l─▒ oldu.
             0 Uyar─▒
             0 Hata
         
-        Ge├ğen S├╝re 00:00:01.78
+        Ge├ğen S├╝re 00:00:01.69
         
       exitCode: 0
   -

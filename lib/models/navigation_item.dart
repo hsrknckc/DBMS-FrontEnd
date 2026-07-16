@@ -5,7 +5,7 @@ enum AppPage {
   databases,
   dataExplorer,
   users,
-  rolesPermissions,
+  permissions,
   auditLogs,
   settings,
 }
