@@ -11,8 +11,7 @@ class AuditLogsPage extends StatefulWidget {
 }
 
 class _AuditLogsPageState extends State<AuditLogsPage> {
-  final TextEditingController _searchController =
-      TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   AuditAction? _selectedAction;
   bool _showOnlyRevertible = false;
@@ -30,16 +29,10 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
           'Mehmet Kaya kullanıcısının departman ve işlem yetkileri güncellendi.',
       oldValues: {
         'Departmanlar': ['Sensor'],
-        'Yetkiler': [
-          'Database görüntüleme',
-          'Veri görüntüleme',
-        ],
+        'Yetkiler': ['Database görüntüleme', 'Veri görüntüleme'],
       },
       newValues: {
-        'Departmanlar': [
-          'Sensor',
-          'Signal',
-        ],
+        'Departmanlar': ['Sensor', 'Signal'],
         'Yetkiler': [
           'Database görüntüleme',
           'Veri görüntüleme',
@@ -55,16 +48,9 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       targetUserId: 'user-3',
       targetUserName: 'Ahmet Yıldız',
       createdAt: DateTime(2026, 7, 15, 13, 20),
-      description:
-          'Ahmet Yıldız silinen kullanıcılar bölümüne taşındı.',
-      oldValues: {
-        'Silindi': false,
-        'Aktif': true,
-      },
-      newValues: {
-        'Silindi': true,
-        'Aktif': false,
-      },
+      description: 'Ahmet Yıldız silinen kullanıcılar bölümüne taşındı.',
+      oldValues: {'Silindi': false, 'Aktif': true},
+      newValues: {'Silindi': true, 'Aktif': false},
     ),
     AuditLog(
       id: 'log-3',
@@ -74,8 +60,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       targetUserId: 'user-2',
       targetUserName: 'Zeynep Demir',
       createdAt: DateTime(2026, 7, 15, 11, 15),
-      description:
-          'Zeynep Demir için şifre yenileme anahtarı oluşturuldu.',
+      description: 'Zeynep Demir için şifre yenileme anahtarı oluşturuldu.',
     ),
     AuditLog(
       id: 'log-4',
@@ -85,14 +70,9 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       targetUserId: 'user-4',
       targetUserName: 'Elif Arslan',
       createdAt: DateTime(2026, 7, 14, 16, 50),
-      description:
-          'Elif Arslan kullanıcısı pasif duruma getirildi.',
-      oldValues: {
-        'Aktif': true,
-      },
-      newValues: {
-        'Aktif': false,
-      },
+      description: 'Elif Arslan kullanıcısı pasif duruma getirildi.',
+      oldValues: {'Aktif': true},
+      newValues: {'Aktif': false},
     ),
     AuditLog(
       id: 'log-5',
@@ -102,13 +82,8 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       targetUserId: 'user-1',
       targetUserName: 'Mehmet Kaya',
       createdAt: DateTime(2026, 7, 14, 15, 10),
-      description:
-          'Signal departmanındaki veriler CSV olarak dışa aktarıldı.',
-      newValues: {
-        'Format': 'CSV',
-        'Departman': 'Signal',
-        'Kayıt sayısı': 1240,
-      },
+      description: 'Signal departmanındaki veriler CSV olarak dışa aktarıldı.',
+      newValues: {'Format': 'CSV', 'Departman': 'Signal', 'Kayıt sayısı': 1240},
     ),
     AuditLog(
       id: 'log-6',
@@ -116,12 +91,8 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       performedById: 'super-admin-1',
       performedByName: 'Ayşe Yılmaz',
       createdAt: DateTime(2026, 7, 14, 10, 30),
-      description:
-          'sensor_archive isimli yeni bir database oluşturuldu.',
-      newValues: {
-        'Database adı': 'sensor_archive',
-        'Departman': 'Sensor',
-      },
+      description: 'sensor_archive isimli yeni bir database oluşturuldu.',
+      newValues: {'Database adı': 'sensor_archive', 'Departman': 'Sensor'},
     ),
   ];
 
@@ -133,24 +104,18 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
           query.isEmpty ||
           log.description.toLowerCase().contains(query) ||
           log.performedByName.toLowerCase().contains(query) ||
-          (log.targetUserName?.toLowerCase().contains(query) ??
-              false);
+          (log.targetUserName?.toLowerCase().contains(query) ?? false);
 
       final matchesAction =
-          _selectedAction == null ||
-          log.action == _selectedAction;
+          _selectedAction == null || log.action == _selectedAction;
 
-      final matchesRevertible =
-          !_showOnlyRevertible || log.canBeReverted;
+      final matchesRevertible = !_showOnlyRevertible || log.canBeReverted;
 
-      return matchesSearch &&
-          matchesAction &&
-          matchesRevertible;
+      return matchesSearch && matchesAction && matchesRevertible;
     }).toList();
 
     filteredLogs.sort(
-      (first, second) =>
-          second.createdAt.compareTo(first.createdAt),
+      (first, second) => second.createdAt.compareTo(first.createdAt),
     );
 
     return filteredLogs;
@@ -175,9 +140,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
         const SizedBox(height: 18),
         _buildFilters(),
         const SizedBox(height: 16),
-        Expanded(
-          child: _buildLogList(filteredLogs),
-        ),
+        Expanded(child: _buildLogList(filteredLogs)),
       ],
     );
   }
@@ -186,10 +149,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'İşlem Geçmişi',
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
+        Text('İşlem Geçmişi', style: Theme.of(context).textTheme.headlineLarge),
         const SizedBox(height: 6),
         Text(
           'Sistemde gerçekleştirilen kullanıcı, yetki ve veri işlemlerini inceleyin.',
@@ -200,11 +160,9 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
   }
 
   Widget _buildSummaryCards() {
-    final revertibleCount =
-        _logs.where((log) => log.canBeReverted).length;
+    final revertibleCount = _logs.where((log) => log.canBeReverted).length;
 
-    final revertedCount =
-        _logs.where((log) => log.isReverted).length;
+    final revertedCount = _logs.where((log) => log.isReverted).length;
 
     return Wrap(
       spacing: 16,
@@ -238,9 +196,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -252,31 +208,24 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               SizedBox(
-                width: isNarrow
-                    ? constraints.maxWidth
-                    : 300,
+                width: isNarrow ? constraints.maxWidth : 300,
                 child: TextField(
                   controller: _searchController,
                   onChanged: (_) {
                     setState(() {});
                   },
                   decoration: const InputDecoration(
-                    hintText:
-                        'Kullanıcı veya işlem ara...',
+                    hintText: 'Kullanıcı veya işlem ara...',
                     prefixIcon: Icon(Icons.search),
                   ),
                 ),
               ),
               SizedBox(
-                width: isNarrow
-                    ? constraints.maxWidth
-                    : 230,
+                width: isNarrow ? constraints.maxWidth : 230,
                 child: DropdownButtonFormField<AuditAction?>(
                   value: _selectedAction,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'İşlem türü',
-                  ),
+                  decoration: const InputDecoration(labelText: 'İşlem türü'),
                   items: [
                     const DropdownMenuItem<AuditAction?>(
                       value: null,
@@ -300,13 +249,8 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                 ),
               ),
               FilterChip(
-                label: const Text(
-                  'Sadece geri alınabilir',
-                ),
-                avatar: const Icon(
-                  Icons.undo_outlined,
-                  size: 18,
-                ),
+                label: const Text('Sadece geri alınabilir'),
+                avatar: const Icon(Icons.undo_outlined, size: 18),
                 selected: _showOnlyRevertible,
                 onSelected: (selected) {
                   setState(() {
@@ -316,12 +260,8 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
               ),
               TextButton.icon(
                 onPressed: _clearFilters,
-                icon: const Icon(
-                  Icons.filter_alt_off_outlined,
-                ),
-                label: const Text(
-                  'Filtreleri temizle',
-                ),
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Filtreleri temizle'),
               ),
             ],
           );
@@ -337,9 +277,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.border,
-          ),
+          border: Border.all(color: AppColors.border),
         ),
         child: const Center(
           child: Column(
@@ -362,10 +300,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
               SizedBox(height: 6),
               Text(
                 'Arama veya filtre kriterlerini değiştirin.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -378,9 +313,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -400,10 +333,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
 
   Widget _buildLogItem(AuditLog log) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 14,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 900;
@@ -415,14 +345,12 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      crossAxisAlignment:
-                          WrapCrossAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           log.action.label,
@@ -432,8 +360,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (log.isReverted)
-                          const _RevertedBadge(),
+                        if (log.isReverted) const _RevertedBadge(),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -452,20 +379,16 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                       children: [
                         _MetadataItem(
                           icon: Icons.person_outline,
-                          label:
-                              'Yapan: ${log.performedByName}',
+                          label: 'Yapan: ${log.performedByName}',
                         ),
                         if (log.targetUserName != null)
                           _MetadataItem(
                             icon: Icons.flag_outlined,
-                            label:
-                                'Hedef: ${log.targetUserName}',
+                            label: 'Hedef: ${log.targetUserName}',
                           ),
                         _MetadataItem(
                           icon: Icons.schedule_outlined,
-                          label: _formatDateTime(
-                            log.createdAt,
-                          ),
+                          label: _formatDateTime(log.createdAt),
                         ),
                       ],
                     ),
@@ -484,10 +407,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                 onPressed: () {
                   _showLogDetails(log);
                 },
-                icon: const Icon(
-                  Icons.visibility_outlined,
-                  size: 18,
-                ),
+                icon: const Icon(Icons.visibility_outlined, size: 18),
                 label: const Text('Detay'),
               ),
               if (log.canBeReverted)
@@ -495,10 +415,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                   onPressed: () {
                     _showRevertDialog(log);
                   },
-                  icon: const Icon(
-                    Icons.undo_outlined,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.undo_outlined, size: 18),
                   label: const Text('Geri Al'),
                 ),
             ],
@@ -506,15 +423,11 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
 
           if (isNarrow) {
             return Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 information,
                 const SizedBox(height: 14),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: buttons,
-                ),
+                Align(alignment: Alignment.centerRight, child: buttons),
               ],
             );
           }
@@ -547,34 +460,21 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
         return AlertDialog(
           title: Text(log.action.label),
           content: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 620,
-              maxHeight: 600,
-            ),
+            constraints: const BoxConstraints(maxWidth: 620, maxHeight: 600),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _DetailRow(
-                    label: 'Açıklama',
-                    value: log.description,
-                  ),
-                  _DetailRow(
-                    label: 'İşlemi yapan',
-                    value: log.performedByName,
-                  ),
+                  _DetailRow(label: 'Açıklama', value: log.description),
+                  _DetailRow(label: 'İşlemi yapan', value: log.performedByName),
                   _DetailRow(
                     label: 'Hedef kullanıcı',
-                    value:
-                        log.targetUserName ?? 'Bulunmuyor',
+                    value: log.targetUserName ?? 'Bulunmuyor',
                   ),
                   _DetailRow(
                     label: 'Tarih',
-                    value: _formatDateTime(
-                      log.createdAt,
-                    ),
+                    value: _formatDateTime(log.createdAt),
                   ),
                   if (log.oldValues.isNotEmpty) ...[
                     const SizedBox(height: 14),
@@ -587,9 +487,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    _ValuesCard(
-                      values: log.oldValues,
-                    ),
+                    _ValuesCard(values: log.oldValues),
                   ],
                   if (log.newValues.isNotEmpty) ...[
                     const SizedBox(height: 18),
@@ -602,9 +500,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    _ValuesCard(
-                      values: log.newValues,
-                    ),
+                    _ValuesCard(values: log.newValues),
                   ],
                   if (log.isReverted) ...[
                     const SizedBox(height: 18),
@@ -612,10 +508,8 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.success
-                            .withOpacity(0.08),
-                        borderRadius:
-                            BorderRadius.circular(10),
+                        color: AppColors.success.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         'Bu işlem ${log.revertedByName ?? 'bir Super Admin'} tarafından geri alındı.',
@@ -643,29 +537,21 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
     );
   }
 
-  Future<void> _showRevertDialog(
-    AuditLog log,
-  ) async {
+  Future<void> _showRevertDialog(AuditLog log) async {
     final shouldRevert = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
-            'Değişikliği geri al',
-          ),
+          title: const Text('Değişikliği geri al'),
           content: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 480,
-            ),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   log.description,
-                  style:
-                      Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -701,9 +587,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       return;
     }
 
-    final index = _logs.indexWhere(
-      (item) => item.id == log.id,
-    );
+    final index = _logs.indexWhere((item) => item.id == log.id);
 
     if (index == -1) {
       return;
@@ -728,8 +612,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
           targetUserId: log.targetUserId,
           targetUserName: log.targetUserName,
           createdAt: revertedAt,
-          description:
-              '${log.action.label} işlemi geri alındı.',
+          description: '${log.action.label} işlemi geri alındı.',
           oldValues: log.newValues,
           newValues: log.oldValues,
         ),
@@ -740,25 +623,17 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Değişiklik geri alındı.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Değişiklik geri alındı.')));
   }
 
   String _formatDateTime(DateTime dateTime) {
-    final day =
-        dateTime.day.toString().padLeft(2, '0');
-    final month =
-        dateTime.month.toString().padLeft(2, '0');
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
     final year = dateTime.year.toString();
-    final hour =
-        dateTime.hour.toString().padLeft(2, '0');
-    final minute =
-        dateTime.minute.toString().padLeft(2, '0');
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
 
     return '$day.$month.$year $hour:$minute';
   }
@@ -785,9 +660,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -798,17 +671,12 @@ class _SummaryCard extends StatelessWidget {
               color: iconColor.withOpacity(0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 22,
-            ),
+            child: Icon(icon, color: iconColor, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
@@ -838,9 +706,7 @@ class _SummaryCard extends StatelessWidget {
 class _ActionIcon extends StatelessWidget {
   final AuditAction action;
 
-  const _ActionIcon({
-    required this.action,
-  });
+  const _ActionIcon({required this.action});
 
   @override
   Widget build(BuildContext context) {
@@ -899,11 +765,7 @@ class _ActionIcon extends StatelessWidget {
         color: AppColors.primary.withOpacity(0.10),
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(
-        icon,
-        color: AppColors.primary,
-        size: 21,
-      ),
+      child: Icon(icon, color: AppColors.primary, size: 21),
     );
   }
 }
@@ -912,28 +774,18 @@ class _MetadataItem extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _MetadataItem({
-    required this.icon,
-    required this.label,
-  });
+  const _MetadataItem({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: AppColors.textSecondary,
-        ),
+        Icon(icon, size: 16, color: AppColors.textSecondary),
         const SizedBox(width: 5),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -946,10 +798,7 @@ class _RevertedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.success.withOpacity(0.10),
         borderRadius: BorderRadius.circular(20),
@@ -970,10 +819,7 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _DetailRow({
-    required this.label,
-    required this.value,
-  });
+  const _DetailRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -983,8 +829,7 @@ class _DetailRow extends StatelessWidget {
         builder: (context, constraints) {
           if (constraints.maxWidth < 400) {
             return Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
@@ -1007,8 +852,7 @@ class _DetailRow extends StatelessWidget {
           }
 
           return Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 width: 130,
@@ -1041,9 +885,7 @@ class _DetailRow extends StatelessWidget {
 class _ValuesCard extends StatelessWidget {
   final Map<String, dynamic> values;
 
-  const _ValuesCard({
-    required this.values,
-  });
+  const _ValuesCard({required this.values});
 
   @override
   Widget build(BuildContext context) {
@@ -1053,9 +895,7 @@ class _ValuesCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1066,8 +906,7 @@ class _ValuesCard extends StatelessWidget {
               builder: (context, constraints) {
                 if (constraints.maxWidth < 400) {
                   return Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         entry.key,
@@ -1090,8 +929,7 @@ class _ValuesCard extends StatelessWidget {
                 }
 
                 return Row(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
                       width: 140,

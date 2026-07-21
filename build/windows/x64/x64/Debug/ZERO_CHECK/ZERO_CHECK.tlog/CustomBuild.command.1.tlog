@@ -1,6 +1,6 @@
-^D:\DBMS-FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\5AF9425C0538F60CC495F6E2075E16B5\GENERATE.STAMP.RULE
+^C:\USERS\IREMB\DOWNLOADS\DBMS-FRONTEND-MAIN\BUILD\WINDOWS\X64\CMAKEFILES\34DA7DE38075745C8D78EAEF410C83AF\GENERATE.STAMP.RULE
 setlocal
-"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SD:/DBMS-FrontEnd/windows -BD:/DBMS-FrontEnd/build/windows/x64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/DBMS-FrontEnd/build/windows/x64/dmbs_frontend.sln
+"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/iremb/Downloads/DBMS-FrontEnd-main/windows -BC:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/dmbs_frontend.sln
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
