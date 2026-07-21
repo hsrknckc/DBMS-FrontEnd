@@ -1,4 +1,4 @@
-# Install script for directory: D:/DBMS-FrontEnd/windows/runner
+# Install script for directory: C:/Users/iremb/Downloads/DBMS-FrontEnd-main/windows/runner
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

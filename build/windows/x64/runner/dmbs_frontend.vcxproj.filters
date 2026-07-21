@@ -1,33 +1,33 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="D:\DBMS-FrontEnd\windows\runner\flutter_window.cpp">
+    <ClCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\flutter_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\DBMS-FrontEnd\windows\runner\main.cpp">
+    <ClCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\DBMS-FrontEnd\windows\runner\utils.cpp">
+    <ClCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\DBMS-FrontEnd\windows\runner\win32_window.cpp">
+    <ClCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\win32_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\DBMS-FrontEnd\windows\flutter\generated_plugin_registrant.cc">
+    <ClCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\flutter\generated_plugin_registrant.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="D:\DBMS-FrontEnd\windows\runner\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="D:\DBMS-FrontEnd\windows\runner\Runner.rc">
+    <ResourceCompile Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\runner\Runner.rc">
       <Filter>Source Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{D74F958B-9191-3399-B796-8150925C86A3}</UniqueIdentifier>
+      <UniqueIdentifier>{58C597F0-857C-318C-9E6D-CD062A2BA35A}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

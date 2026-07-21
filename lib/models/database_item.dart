@@ -3,13 +3,10 @@ class DatabaseItem {
   final String name;
   final String department;
   final String description;
-
   final int collectionCount;
   final int recordCount;
-
   final DateTime createdAt;
   final DateTime updatedAt;
-
   final bool isDeleted;
   final DateTime? deletedAt;
   final String? deletedBy;
@@ -27,6 +24,48 @@ class DatabaseItem {
     this.deletedAt,
     this.deletedBy,
   });
+
+  // ── Serialisation ──────────────────────────────────────────────────────────
+
+  factory DatabaseItem.fromJson(Map<String, dynamic> json) {
+    return DatabaseItem(
+      id: (json['_id'] ?? json['id'] ?? '') as String,
+      name: json['name'] as String? ?? '',
+      department: json['department'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      collectionCount: (json['collectionCount'] as num?)?.toInt() ?? 0,
+      recordCount: (json['recordCount'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.now(),
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'] as String)
+          : null,
+      deletedBy: json['deletedBy'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'department': department,
+      'description': description,
+      'collectionCount': collectionCount,
+      'recordCount': recordCount,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isDeleted': isDeleted,
+      if (deletedAt != null) 'deletedAt': deletedAt!.toIso8601String(),
+      if (deletedBy != null) 'deletedBy': deletedBy,
+    };
+  }
+
+  // ── CopyWith ───────────────────────────────────────────────────────────────
 
   DatabaseItem copyWith({
     String? id,
@@ -53,12 +92,8 @@ class DatabaseItem {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
-      deletedAt: clearDeletedAt
-          ? null
-          : deletedAt ?? this.deletedAt,
-      deletedBy: clearDeletedBy
-          ? null
-          : deletedBy ?? this.deletedBy,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+      deletedBy: clearDeletedBy ? null : (deletedBy ?? this.deletedBy),
     );
   }
 }

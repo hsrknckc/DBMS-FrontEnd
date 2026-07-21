@@ -1,20 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CustomBuild Include="D:\DBMS-FrontEnd\build\windows\x64\CMakeFiles\f880abf82ea99d88c98ede54165b0a16\flutter_windows.dll.rule">
+    <CustomBuild Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\build\windows\x64\CMakeFiles\2b9c66518486769fbce2fba35c83782c\flutter_windows.dll.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
-    <CustomBuild Include="D:\DBMS-FrontEnd\build\windows\x64\CMakeFiles\22acf39d096f3e362612c4dd852fb03a\flutter_assemble.rule">
+    <CustomBuild Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\build\windows\x64\CMakeFiles\6b4b29434e9d08ff44531058cb6675d0\flutter_assemble.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
-    <CustomBuild Include="D:\DBMS-FrontEnd\windows\flutter\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\windows\flutter\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="D:\DBMS-FrontEnd\build\windows\x64\flutter\CMakeFiles\flutter_assemble" />
+    <None Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\build\windows\x64\flutter\CMakeFiles\flutter_assemble" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CMake Rules">
-      <UniqueIdentifier>{F3D439F9-8ABD-37CF-8E00-CF4871EA8044}</UniqueIdentifier>
+      <UniqueIdentifier>{0A4B60D3-3FBC-362B-A483-51CEA8486C9F}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

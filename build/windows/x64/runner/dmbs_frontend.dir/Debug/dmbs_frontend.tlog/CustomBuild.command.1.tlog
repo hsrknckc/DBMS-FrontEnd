@@ -1,6 +1,6 @@
-^D:\DBMS-FRONTEND\WINDOWS\RUNNER\CMAKELISTS.TXT
+^C:\USERS\IREMB\DOWNLOADS\DBMS-FRONTEND-MAIN\WINDOWS\RUNNER\CMAKELISTS.TXT
 setlocal
-"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SD:/DBMS-FrontEnd/windows -BD:/DBMS-FrontEnd/build/windows/x64 --check-stamp-file D:/DBMS-FrontEnd/build/windows/x64/runner/CMakeFiles/generate.stamp
+"D:\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/iremb/Downloads/DBMS-FrontEnd-main/windows -BC:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64 --check-stamp-file C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/CMakeFiles/generate.stamp
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

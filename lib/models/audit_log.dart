@@ -16,76 +16,76 @@ extension AuditActionExtension on AuditAction {
   String get label {
     switch (this) {
       case AuditAction.userCreated:
-        return 'Kullanıcı oluşturuldu';
-
+        return 'Kullanıcı Oluşturuldu';
       case AuditAction.userUpdated:
-        return 'Kullanıcı güncellendi';
-
+        return 'Kullanıcı Güncellendi';
       case AuditAction.userStatusChanged:
-        return 'Kullanıcı durumu değiştirildi';
-
+        return 'Kullanıcı Durumu Değiştirildi';
       case AuditAction.userSoftDeleted:
-        return 'Kullanıcı silindi';
-
+        return 'Kullanıcı Silindi';
       case AuditAction.userRestored:
-        return 'Kullanıcı geri yüklendi';
-
+        return 'Kullanıcı Geri Yüklendi';
       case AuditAction.userPermanentlyDeleted:
-        return 'Kullanıcı kalıcı olarak silindi';
-
+        return 'Kullanıcı Kalıcı Silindi';
       case AuditAction.permissionsUpdated:
-        return 'Yetkiler güncellendi';
-
+        return 'Yetkiler Güncellendi';
       case AuditAction.permissionsReverted:
-        return 'Yetki değişikliği geri alındı';
-
+        return 'Yetkiler Geri Alındı';
       case AuditAction.passwordResetRequested:
-        return 'Şifre yenileme anahtarı oluşturuldu';
-
+        return 'Şifre Sıfırlama İstendi';
       case AuditAction.dataExported:
-        return 'Veri dışa aktarıldı';
-
+        return 'Veri Dışa Aktarıldı';
       case AuditAction.databaseCreated:
-        return 'Database oluşturuldu';
+        return 'Database Oluşturuldu';
     }
   }
 
-  bool get canBeReverted {
+  String get code {
     switch (this) {
-      case AuditAction.userUpdated:
-      case AuditAction.userStatusChanged:
-      case AuditAction.userSoftDeleted:
-      case AuditAction.userRestored:
-      case AuditAction.permissionsUpdated:
-        return true;
-
       case AuditAction.userCreated:
+        return 'USER_CREATED';
+      case AuditAction.userUpdated:
+        return 'USER_UPDATED';
+      case AuditAction.userStatusChanged:
+        return 'USER_STATUS_CHANGED';
+      case AuditAction.userSoftDeleted:
+        return 'USER_SOFT_DELETED';
+      case AuditAction.userRestored:
+        return 'USER_RESTORED';
       case AuditAction.userPermanentlyDeleted:
+        return 'USER_PERMANENTLY_DELETED';
+      case AuditAction.permissionsUpdated:
+        return 'PERMISSIONS_UPDATED';
       case AuditAction.permissionsReverted:
+        return 'PERMISSIONS_REVERTED';
       case AuditAction.passwordResetRequested:
+        return 'PASSWORD_RESET_REQUESTED';
       case AuditAction.dataExported:
+        return 'DATA_EXPORTED';
       case AuditAction.databaseCreated:
-        return false;
+        return 'DATABASE_CREATED';
     }
+  }
+
+  static AuditAction fromCode(String code) {
+    return AuditAction.values.firstWhere(
+      (a) => a.code == code,
+      orElse: () => AuditAction.userUpdated,
+    );
   }
 }
 
 class AuditLog {
   final String id;
   final AuditAction action;
-
   final String performedById;
   final String performedByName;
-
   final String? targetUserId;
   final String? targetUserName;
-
   final DateTime createdAt;
   final String description;
-
   final Map<String, dynamic> oldValues;
   final Map<String, dynamic> newValues;
-
   final bool isReverted;
   final DateTime? revertedAt;
   final String? revertedByName;
@@ -95,20 +95,70 @@ class AuditLog {
     required this.action,
     required this.performedById,
     required this.performedByName,
-    required this.createdAt,
-    required this.description,
     this.targetUserId,
     this.targetUserName,
-    this.oldValues = const {},
-    this.newValues = const {},
+    required this.createdAt,
+    required this.description,
+    Map<String, dynamic>? oldValues,
+    Map<String, dynamic>? newValues,
     this.isReverted = false,
     this.revertedAt,
     this.revertedByName,
-  });
+  })  : oldValues = oldValues ?? const {},
+        newValues = newValues ?? const {};
 
   bool get canBeReverted {
-    return action.canBeReverted && !isReverted;
+    return !isReverted &&
+        (action == AuditAction.permissionsUpdated ||
+            action == AuditAction.userStatusChanged);
   }
+
+  // ── Serialisation ──────────────────────────────────────────────────────────
+
+  /// MongoDB dökümanından oluştur. `_id` → `id` dönüşümü dahil.
+  factory AuditLog.fromJson(Map<String, dynamic> json) {
+    return AuditLog(
+      id: (json['_id'] ?? json['id'] ?? '') as String,
+      action: AuditActionExtension.fromCode(json['action'] as String? ?? ''),
+      performedById: json['performedById'] as String? ?? '',
+      performedByName: json['performedByName'] as String? ?? '',
+      targetUserId: json['targetUserId'] as String?,
+      targetUserName: json['targetUserName'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      description: json['description'] as String? ?? '',
+      oldValues:
+          (json['oldValues'] as Map<String, dynamic>?) ?? const {},
+      newValues:
+          (json['newValues'] as Map<String, dynamic>?) ?? const {},
+      isReverted: json['isReverted'] as bool? ?? false,
+      revertedAt: json['revertedAt'] != null
+          ? DateTime.parse(json['revertedAt'] as String)
+          : null,
+      revertedByName: json['revertedByName'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'action': action.code,
+      'performedById': performedById,
+      'performedByName': performedByName,
+      if (targetUserId != null) 'targetUserId': targetUserId,
+      if (targetUserName != null) 'targetUserName': targetUserName,
+      'createdAt': createdAt.toIso8601String(),
+      'description': description,
+      'oldValues': oldValues,
+      'newValues': newValues,
+      'isReverted': isReverted,
+      if (revertedAt != null) 'revertedAt': revertedAt!.toIso8601String(),
+      if (revertedByName != null) 'revertedByName': revertedByName,
+    };
+  }
+
+  // ── CopyWith ───────────────────────────────────────────────────────────────
 
   AuditLog copyWith({
     String? id,

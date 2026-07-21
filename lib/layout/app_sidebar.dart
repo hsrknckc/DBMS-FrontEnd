@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
+import '../main.dart'; // DatabaseManagementApp'e erişmek için ekledik
 import '../models/app_user.dart';
 import '../models/navigation_item.dart';
+import 'logout_confirmation_dialog.dart';
 
 class AppSidebar extends StatelessWidget {
   final AppPage selectedPage;
@@ -13,7 +15,7 @@ class AppSidebar extends StatelessWidget {
     super.key,
     required this.selectedPage,
     required this.onPageSelected,
-    required this.currentUser,
+    required this.currentUser, required void Function() onProfilePressed, required Null Function() onLogoPressed,
   });
 
   static const List<NavigationItem> superAdminItems = [
@@ -88,25 +90,31 @@ class AppSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = navigationItems;
+    final theme = Theme.of(context);
+    
+    // main.dart'ta tanımladığımız state'ten genişlik bilgisini alıyoruz
+    final appState = DatabaseManagementApp.of(context);
+    final isCompact = appState?.isCompactSidebar ?? false;
 
-    return Container(
-      width: 260,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200), // Daralırken/açılırken akıcı geçiş sağlar
+      width: isCompact ? 76 : 260,
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
         border: Border(
           right: BorderSide(
-            color: AppColors.border,
+            color: theme.dividerColor,
           ),
         ),
       ),
       child: Column(
         children: [
-          _buildLogoArea(),
+          _buildLogoArea(context, isCompact),
           const Divider(height: 1),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompact ? 8 : 12,
                 vertical: 18,
               ),
               itemCount: items.length,
@@ -120,6 +128,7 @@ class AppSidebar extends StatelessWidget {
                 return _SidebarMenuItem(
                   item: item,
                   isSelected: isSelected,
+                  isCompact: isCompact, // Butonların kendini küçültmesi için paslıyoruz
                   onTap: () {
                     onPageSelected(item.page);
                   },
@@ -128,20 +137,23 @@ class AppSidebar extends StatelessWidget {
             ),
           ),
           const Divider(height: 1),
-          _buildUserArea(),
+          _buildUserArea(context, isCompact),
         ],
       ),
     );
   }
 
-  Widget _buildLogoArea() {
-    return const SizedBox(
+  Widget _buildLogoArea(BuildContext context, bool isCompact) {
+    final theme = Theme.of(context);
+    
+    return SizedBox(
       height: 80,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 20),
         child: Row(
+          mainAxisAlignment: isCompact ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 38,
               height: 38,
               child: DecoratedBox(
@@ -158,78 +170,94 @@ class AppSidebar extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Data Manager',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+            // Eğer sidebar daraltılmışsa "Data Manager" yazısını gizle
+            if (!isCompact) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Data Manager',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textTheme.titleMedium?.color ?? AppColors.textPrimary,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildUserArea() {
+  Widget _buildUserArea(BuildContext context, bool isCompact) {
+    final theme = Theme.of(context);
+    
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompact ? 8 : 16),
       child: Row(
+        mainAxisAlignment: isCompact ? MainAxisAlignment.center : MainAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: AppColors.background,
+            backgroundColor: theme.scaffoldBackgroundColor,
             child: Text(
               currentUser.initials,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color ?? AppColors.textSecondary,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  currentUser.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+          // Daraltılmış modda kullanıcı detaylarını ve çıkış butonunu gizle/düzenle
+          if (!isCompact) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    currentUser.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodyLarge?.color ?? AppColors.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  currentUser.roleLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 2),
+                  Text(
+                    currentUser.roleLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.textTheme.bodyMedium?.color ?? AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Çıkış yap',
-            onPressed: () {},
-            icon: const Icon(
-              Icons.logout,
-              size: 20,
-              color: AppColors.textSecondary,
+            IconButton(
+              tooltip: 'Çıkış yap',
+              onPressed: () {
+                LogoutConfirmationDialog.show(
+                  context,
+                  onConfirm: () {
+                    DatabaseManagementApp.of(context)?.logout();
+                  },
+                );
+              },
+              icon: Icon(
+                Icons.logout,
+                size: 20,
+                color: theme.textTheme.bodyMedium?.color ?? AppColors.textSecondary,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -239,53 +267,65 @@ class AppSidebar extends StatelessWidget {
 class _SidebarMenuItem extends StatelessWidget {
   final NavigationItem item;
   final bool isSelected;
+  final bool isCompact; // Menü elemanının dar olup olmadığı bilgisi
   final VoidCallback onTap;
 
   const _SidebarMenuItem({
     required this.item,
     required this.isSelected,
+    required this.isCompact,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Material(
       color: isSelected
-          ? AppColors.primary.withValues(alpha: 0.10)
+          ? theme.colorScheme.primary.withValues(alpha: 0.10)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 12,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                item.icon,
-                size: 21,
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                  ),
+        child: Tooltip(
+          // Menü daraldığında ikonun üzerine gelince ne olduğunu gösterir
+          message: isCompact ? item.title : '',
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 0 : 14,
+              vertical: 12,
+            ),
+            child: Row(
+              mainAxisAlignment: isCompact ? MainAxisAlignment.center : MainAxisAlignment.start,
+              children: [
+                Icon(
+                  item.icon,
+                  size: 21,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : (theme.textTheme.bodyMedium?.color ?? AppColors.textSecondary),
                 ),
-              ),
-            ],
+                // Eğer menü daralmışsa metin alanını tamamen kaldır
+                if (!isCompact) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : (theme.textTheme.bodyMedium?.color ?? AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
