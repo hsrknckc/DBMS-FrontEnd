@@ -1,5 +1,6 @@
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/data/icudtl.dat
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/flutter_windows.dll
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/dartjni.dll
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/data/flutter_assets/AssetManifest.bin
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/data/flutter_assets/FontManifest.json
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/Debug/data/flutter_assets/fonts/MaterialIcons-Regular.otf

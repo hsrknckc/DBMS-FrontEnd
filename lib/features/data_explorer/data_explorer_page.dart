@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
@@ -261,11 +263,13 @@ class _DataExplorerPageState
         );
   }
 
+  // Export yetkisi: tüm kullanıcılar dışa aktarabilir; _canExport
+  // tutuldu ama PopupMenuButton üzerinden erişim direkt olduğundan
+  // bu getter referans edilmiyor — ileride ihtiyaç duyulursa kullanılır.
+  // ignore: unused_element
   bool get _canExport {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataExport,
-        );
+        widget.currentUser.hasPermission(Permission.dataExport);
   }
 
   bool get _hasSelection {
@@ -347,41 +351,51 @@ class _DataExplorerPageState
           ],
         );
 
+        // ── Yazma yetkisi kontrolü ──────────────────────────────────────────
+        // SuperAdmin her zaman tam yetkili.
+        // Normal kullanıcı için _canImport / _canCreate yoksa butonlar
+        // görünür ama disabled + %50 opaklık + Tooltip ile uyarı verir.
+        const _noWriteTooltip =
+            'Bu işlem için yazma yetkiniz bulunmamaktadır.\nYöneticinizle iletişime geçin.';
+
+        Widget importBtn = Opacity(
+          opacity: _canImport ? 1.0 : 0.5,
+          child: Tooltip(
+            message: _canImport ? '' : _noWriteTooltip,
+            child: OutlinedButton.icon(
+              onPressed: _canImport && _hasSelection && !_isImporting
+                  ? _pickAndImportJson
+                  : null,
+              icon: _isImporting
+                  ? const SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload_file_outlined),
+              label: Text(_isImporting ? 'Dosya okunuyor' : 'JSON İçe Aktar'),
+            ),
+          ),
+        );
+
+        Widget createBtn = Opacity(
+          opacity: _canCreate ? 1.0 : 0.5,
+          child: Tooltip(
+            message: _canCreate ? '' : _noWriteTooltip,
+            child: ElevatedButton.icon(
+              onPressed: _canCreate && _hasSelection
+                  ? _showCreateRecordDialog
+                  : null,
+              icon: const Icon(Icons.add),
+              label: const Text('Yeni Kayıt'),
+            ),
+          ),
+        );
+
         final actions = Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: [
-            if (_canImport)
-              OutlinedButton.icon(
-                onPressed: _hasSelection && !_isImporting
-                    ? _pickAndImportJson
-                    : null,
-                icon: _isImporting
-                    ? const SizedBox(
-                        width: 17,
-                        height: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.upload_file_outlined,
-                      ),
-                label: Text(
-                  _isImporting
-                      ? 'Dosya okunuyor'
-                      : 'JSON İçe Aktar',
-                ),
-              ),
-            if (_canCreate)
-              ElevatedButton.icon(
-                onPressed: _hasSelection
-                    ? _showCreateRecordDialog
-                    : null,
-                icon: const Icon(Icons.add),
-                label: const Text('Yeni Kayıt'),
-              ),
-          ],
+          children: [importBtn, createBtn],
         );
 
         if (isNarrow) {
@@ -579,15 +593,44 @@ class _DataExplorerPageState
                 icon: Icons.description_outlined,
                 text: '$recordCount kayıt',
               ),
-              if (_canExport)
-                OutlinedButton.icon(
-                  onPressed: recordCount == 0
-                      ? null
-                      : _showExportDialog,
-                  icon:
-                      const Icon(Icons.download_outlined),
+              // Export: tüm kullanıcılar görebilir.
+              // PopupMenuButton ile format seçimi yapılır.
+              PopupMenuButton<String>(
+                enabled: recordCount > 0,
+                tooltip: recordCount == 0
+                    ? 'Dışa aktarılacak kayıt yok'
+                    : 'Dışa Aktar',
+                offset: const Offset(0, 44),
+                onSelected: _exportWithFormat,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'JSON',
+                    child: Row(
+                      children: [
+                        Icon(Icons.data_object, size: 18),
+                        SizedBox(width: 10),
+                        Text('JSON Formatında İndir'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'CSV',
+                    child: Row(
+                      children: [
+                        Icon(Icons.table_chart_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('CSV Formatında İndir'),
+                      ],
+                    ),
+                  ),
+                ],
+                child: OutlinedButton.icon(
+                  // onPressed null yaparak tıklamayı PopupMenuButton'a bırakıyoruz
+                  onPressed: recordCount == 0 ? null : () {},
+                  icon: const Icon(Icons.download_outlined),
                   label: const Text('Dışa Aktar'),
                 ),
+              ),
             ],
           );
 
@@ -700,41 +743,50 @@ class _DataExplorerPageState
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: 'Detay',
+                              tooltip: _canUpdate
+                                  ? 'Detay'
+                                  : 'Detay (Sadece Okunabilir)',
                               onPressed: () {
                                 _showRecordDetails(
                                   record,
+                                  readOnly: !_canUpdate,
                                 );
                               },
                               icon: const Icon(
                                 Icons.visibility_outlined,
                               ),
                             ),
-                            if (_canUpdate)
-                              IconButton(
-                                tooltip: 'Düzenle',
-                                onPressed: () {
-                                  _showEditRecordDialog(
-                                    record,
-                                  );
-                                },
-                                icon: const Icon(
-                                  Icons.edit_outlined,
+                            Opacity(
+                              opacity: _canUpdate ? 1.0 : 0.5,
+                              child: Tooltip(
+                                message: _canUpdate
+                                    ? 'Düzenle'
+                                    : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                                child: IconButton(
+                                  onPressed: _canUpdate
+                                      ? () => _showEditRecordDialog(record)
+                                      : null,
+                                  icon: const Icon(Icons.edit_outlined),
                                 ),
                               ),
-                            if (_canDelete)
-                              IconButton(
-                                tooltip: 'Sil',
-                                onPressed: () {
-                                  _showDeleteDialog(
-                                    record,
-                                  );
-                                },
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: AppColors.danger,
+                            ),
+                            Opacity(
+                              opacity: _canDelete ? 1.0 : 0.5,
+                              child: Tooltip(
+                                message: _canDelete
+                                    ? 'Sil'
+                                    : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                                child: IconButton(
+                                  onPressed: _canDelete
+                                      ? () => _showDeleteDialog(record)
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: AppColors.danger,
+                                  ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -810,27 +862,37 @@ class _DataExplorerPageState
                         Icons.visibility_outlined,
                       ),
                     ),
-                    if (_canUpdate)
-                      IconButton(
-                        tooltip: 'Düzenle',
-                        onPressed: () {
-                          _showEditRecordDialog(record);
-                        },
-                        icon: const Icon(
-                          Icons.edit_outlined,
+                    Opacity(
+                      opacity: _canUpdate ? 1.0 : 0.5,
+                      child: Tooltip(
+                        message: _canUpdate
+                            ? 'Düzenle'
+                            : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                        child: IconButton(
+                          onPressed: _canUpdate
+                              ? () => _showEditRecordDialog(record)
+                              : null,
+                          icon: const Icon(Icons.edit_outlined),
                         ),
                       ),
-                    if (_canDelete)
-                      IconButton(
-                        tooltip: 'Sil',
-                        onPressed: () {
-                          _showDeleteDialog(record);
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: AppColors.danger,
+                    ),
+                    Opacity(
+                      opacity: _canDelete ? 1.0 : 0.5,
+                      child: Tooltip(
+                        message: _canDelete
+                            ? 'Sil'
+                            : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                        child: IconButton(
+                          onPressed: _canDelete
+                              ? () => _showDeleteDialog(record)
+                              : null,
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.danger,
+                          ),
                         ),
                       ),
+                    ),
                   ],
                 ),
                 const Divider(),
@@ -1441,23 +1503,51 @@ class _DataExplorerPageState
   }
 
   Future<void> _showRecordDetails(
-    DataRecord record,
-  ) async {
+    DataRecord record, {
+    bool readOnly = false,
+  }) async {
     final jsonText =
         const JsonEncoder.withIndent('  ').convert({
       '_id': record.id,
       ...record.data,
-      '_createdAt':
-          record.createdAt.toIso8601String(),
-      '_updatedAt':
-          record.updatedAt.toIso8601String(),
+      '_createdAt': record.createdAt.toIso8601String(),
+      '_updatedAt': record.updatedAt.toIso8601String(),
     });
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(record.id),
+          title: Row(
+            children: [
+              Expanded(child: Text(record.id, overflow: TextOverflow.ellipsis)),
+              if (readOnly) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, size: 13, color: AppColors.warning),
+                      SizedBox(width: 4),
+                      Text(
+                        'Sadece Okunabilir',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: 650,
@@ -1476,9 +1566,7 @@ class _DataExplorerPageState
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Kapat'),
             ),
           ],
@@ -1487,47 +1575,105 @@ class _DataExplorerPageState
     );
   }
 
-  Future<void> _showExportDialog() async {
-    final format = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Dışa Aktar'),
-          content: const Text(
-            'Kayıtları hangi formatta dışa aktarmak istiyorsunuz?',
-          ),
-          actions: [
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop('CSV');
-              },
-              icon:
-                  const Icon(Icons.table_chart_outlined),
-              label: const Text('CSV'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop('JSON');
-              },
-              icon: const Icon(Icons.data_object),
-              label: const Text('JSON'),
-            ),
-          ],
-        );
-      },
-    );
+  // ── Export: Format seçimi PopupMenu'den gelir ─────────────────────────────
+  Future<void> _exportWithFormat(String format) async {
+    final records = _filteredRecords;
+    if (records.isEmpty) return;
 
-    if (format == null || !mounted) {
-      return;
+    final collectionName = _selectedCollection ?? 'export';
+    final ext = format.toLowerCase(); // 'json' veya 'csv'
+    final defaultFileName = '${collectionName}.$ext';
+
+    // Downloads klasörünü bul (path_provider)
+    String? initialDir;
+    try {
+      final downloads = await getDownloadsDirectory();
+      initialDir = downloads?.path;
+    } catch (_) {
+      // Desteklenmeyen platformda görmezden gel
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$format dışa aktarma işlemi backend bağlantısıyla dosya oluşturacak.',
-        ),
-      ),
+    // Masaüstü kaydetme penceresi — file_picker ^11 static API
+    final savePath = await FilePicker.saveFile(
+      dialogTitle: '$format formatında dışa aktar',
+      fileName: defaultFileName,
+      initialDirectory: initialDir,
+      type: FileType.custom,
+      allowedExtensions: [ext],
     );
+
+    if (savePath == null) return; // kullanıcı iptal etti
+    if (!mounted) return;
+
+    try {
+      final content = format == 'JSON'
+          ? _buildJsonExport(records)
+          : _buildCsvExport(records);
+
+      await File(savePath).writeAsString(content, flush: true);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${records.length} kayıt $format olarak kaydedildi: $savePath',
+          ),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Tamam',
+            onPressed: () {},
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorMessage('Dosya yazılamadı: $e');
+    }
+  }
+
+  String _buildJsonExport(List<DataRecord> records) {
+    final docs = records.map((r) => {
+          '_id': r.id,
+          ...r.data,
+          '_createdAt': r.createdAt.toIso8601String(),
+          '_updatedAt': r.updatedAt.toIso8601String(),
+        }).toList();
+    return const JsonEncoder.withIndent('  ').convert(docs);
+  }
+
+  String _buildCsvExport(List<DataRecord> records) {
+    // Tüm sütunları topla
+    final columns = <String>{};
+    for (final r in records) {
+      columns.addAll(r.data.keys);
+    }
+    final cols = columns.toList();
+
+    final buffer = StringBuffer();
+    // Header satırı
+    buffer.writeln((['_id', ...cols, '_createdAt', '_updatedAt'])
+        .map(_csvEscape)
+        .join(','));
+    // Veri satırları
+    for (final r in records) {
+      final row = [
+        r.id,
+        ...cols.map((c) => _displayValue(r.data[c])),
+        r.createdAt.toIso8601String(),
+        r.updatedAt.toIso8601String(),
+      ].map(_csvEscape).join(',');
+      buffer.writeln(row);
+    }
+    return buffer.toString();
+  }
+
+  String _csvEscape(String value) {
+    if (value.contains(',') ||
+        value.contains('"') ||
+        value.contains('\n')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
   }
 
   Widget _buildAccessDenied() {

@@ -12,8 +12,7 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage> {
-  final TextEditingController _searchController =
-      TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   /// 0: Tümü
   /// 1: Aktif
@@ -27,10 +26,7 @@ class _UsersPageState extends State<UsersPage> {
       name: 'Mehmet Kaya',
       email: 'mehmet.kaya@company.com',
       role: UserRole.user,
-      departments: const {
-        'Sensor',
-        'Signal',
-      },
+      departments: const {'Sensor', 'Signal'},
       permissions: const {
         Permission.databaseView,
         Permission.dataView,
@@ -45,9 +41,7 @@ class _UsersPageState extends State<UsersPage> {
       name: 'Zeynep Demir',
       email: 'zeynep.demir@company.com',
       role: UserRole.user,
-      departments: const {
-        'Acoustic',
-      },
+      departments: const {'Acoustic'},
       permissions: const {
         Permission.databaseView,
         Permission.dataView,
@@ -63,13 +57,8 @@ class _UsersPageState extends State<UsersPage> {
       name: 'Ahmet Yıldız',
       email: 'ahmet.yildiz@company.com',
       role: UserRole.user,
-      departments: const {
-        'Signal',
-      },
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-      },
+      departments: const {'Signal'},
+      permissions: const {Permission.databaseView, Permission.dataView},
       isActive: false,
       lastLoginAt: DateTime(2026, 7, 8, 10, 30),
       lastLogoutAt: DateTime(2026, 7, 8, 16, 55),
@@ -79,10 +68,7 @@ class _UsersPageState extends State<UsersPage> {
       name: 'Elif Arslan',
       email: 'elif.arslan@company.com',
       role: UserRole.user,
-      departments: {
-        'Sensor',
-        'Acoustic',
-      },
+      departments: {'Sensor', 'Acoustic'},
       permissions: {
         Permission.databaseView,
         Permission.dataView,
@@ -96,13 +82,8 @@ class _UsersPageState extends State<UsersPage> {
       name: 'Burak Çetin',
       email: 'burak.cetin@company.com',
       role: UserRole.user,
-      departments: const {
-        'Sonar',
-      },
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-      },
+      departments: const {'Sonar'},
+      permissions: const {Permission.databaseView, Permission.dataView},
       isActive: false,
       isDeleted: true,
       deletedAt: DateTime(2026, 7, 13, 15, 30),
@@ -119,8 +100,7 @@ class _UsersPageState extends State<UsersPage> {
           user.name.toLowerCase().contains(query) ||
           user.email.toLowerCase().contains(query) ||
           user.departments.any(
-            (department) =>
-                department.toLowerCase().contains(query),
+            (department) => department.toLowerCase().contains(query),
           );
 
       if (!matchesQuery) {
@@ -214,9 +194,7 @@ class _UsersPageState extends State<UsersPage> {
         ),
         ElevatedButton.icon(
           onPressed: _showAddUserDialog,
-          icon: const Icon(
-            Icons.person_add_alt_1_outlined,
-          ),
+          icon: const Icon(Icons.person_add_alt_1_outlined),
           label: const Text('Yeni Kullanıcı'),
         ),
       ],
@@ -270,9 +248,7 @@ class _UsersPageState extends State<UsersPage> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -291,18 +267,9 @@ class _UsersPageState extends State<UsersPage> {
           const SizedBox(width: 16),
           SegmentedButton<int>(
             segments: const [
-              ButtonSegment<int>(
-                value: 0,
-                label: Text('Tümü'),
-              ),
-              ButtonSegment<int>(
-                value: 1,
-                label: Text('Aktif'),
-              ),
-              ButtonSegment<int>(
-                value: 2,
-                label: Text('Pasif'),
-              ),
+              ButtonSegment<int>(value: 0, label: Text('Tümü')),
+              ButtonSegment<int>(value: 1, label: Text('Aktif')),
+              ButtonSegment<int>(value: 2, label: Text('Pasif')),
               ButtonSegment<int>(
                 value: 3,
                 label: Text('Silinenler'),
@@ -330,74 +297,72 @@ class _UsersPageState extends State<UsersPage> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: users.isEmpty
           ? _buildEmptyState(showingDeletedUsers)
           : ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(
-                        AppColors.background,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      // Yalnızca dikey kaydırma — tablo satırları çok olunca
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          // Tablo her zaman en az container genişliğini doldurur
+                          constraints: BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(
+                              AppColors.background,
+                            ),
+                            columnSpacing: 28,
+                            horizontalMargin: 20,
+                            dataRowMinHeight: 68,
+                            dataRowMaxHeight: 86,
+                            columns: [
+                              const DataColumn(label: Text('Kullanıcı')),
+                              const DataColumn(label: Text('Departmanlar')),
+                              DataColumn(
+                                label: Text(
+                                  showingDeletedUsers
+                                      ? 'Silinme Tarihi'
+                                      : 'Son Giriş',
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  showingDeletedUsers
+                                      ? 'Silen Kullanıcı'
+                                      : 'Son Çıkış',
+                                ),
+                              ),
+                              const DataColumn(label: Text('Durum')),
+                              const DataColumn(label: Text('İşlemler')),
+                            ],
+                            rows: users.map((user) {
+                              return _buildUserRow(
+                                user,
+                                showingDeletedUsers: showingDeletedUsers,
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
-                      columnSpacing: 28,
-                      horizontalMargin: 20,
-                      dataRowMinHeight: 68,
-                      dataRowMaxHeight: 86,
-                      columns: [
-                        const DataColumn(
-                          label: Text('Kullanıcı'),
-                        ),
-                        const DataColumn(
-                          label: Text('Departmanlar'),
-                        ),
-                        DataColumn(
-                          label: Text(
-                            showingDeletedUsers
-                                ? 'Silinme Tarihi'
-                                : 'Son Giriş',
-                          ),
-                        ),
-                        DataColumn(
-                          label: Text(
-                            showingDeletedUsers
-                                ? 'Silen Kullanıcı'
-                                : 'Son Çıkış',
-                          ),
-                        ),
-                        const DataColumn(
-                          label: Text('Durum'),
-                        ),
-                        const DataColumn(
-                          label: Text('İşlemler'),
-                        ),
-                      ],
-                      rows: users.map((user) {
-                        return _buildUserRow(
-                          user,
-                          showingDeletedUsers:
-                              showingDeletedUsers,
-                        );
-                      }).toList(),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
     );
   }
 
-  DataRow _buildUserRow(
-    AppUser user, {
-    required bool showingDeletedUsers,
-  }) {
+
+  DataRow _buildUserRow(AppUser user, {required bool showingDeletedUsers}) {
     return DataRow(
       cells: [
         DataCell(
@@ -407,8 +372,7 @@ class _UsersPageState extends State<UsersPage> {
               children: [
                 CircleAvatar(
                   radius: 19,
-                  backgroundColor:
-                      AppColors.primary.withOpacity(0.10),
+                  backgroundColor: AppColors.primary.withOpacity(0.10),
                   child: Text(
                     user.initials,
                     style: const TextStyle(
@@ -422,8 +386,7 @@ class _UsersPageState extends State<UsersPage> {
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         user.name,
@@ -464,11 +427,8 @@ class _UsersPageState extends State<UsersPage> {
                 : Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children:
-                        user.departments.map((department) {
-                      return _DepartmentChip(
-                        label: department,
-                      );
+                    children: user.departments.map((department) {
+                      return _DepartmentChip(label: department);
                     }).toList(),
                   ),
           ),
@@ -504,9 +464,7 @@ class _UsersPageState extends State<UsersPage> {
         DataCell(
           showingDeletedUsers
               ? const _DeletedBadge()
-              : _StatusBadge(
-                  isActive: user.isActive,
-                ),
+              : _StatusBadge(isActive: user.isActive),
         ),
         DataCell(
           showingDeletedUsers
@@ -545,10 +503,7 @@ class _UsersPageState extends State<UsersPage> {
                       onPressed: () {
                         _showEditUserDialog(user);
                       },
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        size: 20,
-                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 20),
                     ),
                     IconButton(
                       tooltip: user.isActive
@@ -565,15 +520,11 @@ class _UsersPageState extends State<UsersPage> {
                       ),
                     ),
                     IconButton(
-                      tooltip:
-                          'Şifre yenileme anahtarı oluştur',
+                      tooltip: 'Şifre yenileme anahtarı oluştur',
                       onPressed: () {
                         _showPasswordResetDialog(user);
                       },
-                      icon: const Icon(
-                        Icons.key_outlined,
-                        size: 20,
-                      ),
+                      icon: const Icon(Icons.key_outlined, size: 20),
                     ),
                     IconButton(
                       tooltip: 'Kullanıcıyı sil',
@@ -628,18 +579,14 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   void _toggleUserStatus(AppUser user) {
-    final index = _users.indexWhere(
-      (item) => item.id == user.id,
-    );
+    final index = _users.indexWhere((item) => item.id == user.id);
 
     if (index == -1 || user.isDeleted) {
       return;
     }
 
     setState(() {
-      _users[index] = user.copyWith(
-        isActive: !user.isActive,
-      );
+      _users[index] = user.copyWith(isActive: !user.isActive);
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -707,9 +654,7 @@ class _UsersPageState extends State<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere(
-      (item) => item.id == user.id,
-    );
+    final index = _users.indexWhere((item) => item.id == user.id);
 
     if (index == -1) {
       return;
@@ -730,9 +675,7 @@ class _UsersPageState extends State<UsersPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${user.name} silinen kullanıcılar bölümüne taşındı.',
-        ),
+        content: Text('${user.name} silinen kullanıcılar bölümüne taşındı.'),
         action: SnackBarAction(
           label: 'Geri Al',
           onPressed: () {
@@ -777,9 +720,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   void _restoreUser(String userId) {
-    final index = _users.indexWhere(
-      (item) => item.id == userId,
-    );
+    final index = _users.indexWhere((item) => item.id == userId);
 
     if (index == -1) {
       return;
@@ -800,18 +741,12 @@ class _UsersPageState extends State<UsersPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${user.name} geri yüklendi.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('${user.name} geri yüklendi.')));
   }
 
-  Future<void> _showPermanentDeleteDialog(
-    AppUser user,
-  ) async {
+  Future<void> _showPermanentDeleteDialog(AppUser user) async {
     final confirmationController = TextEditingController();
 
     final shouldDelete = await showDialog<bool>(
@@ -819,8 +754,7 @@ class _UsersPageState extends State<UsersPage> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final canDelete =
-                confirmationController.text.trim() == 'SİL';
+            final canDelete = confirmationController.text.trim() == 'SİL';
 
             return AlertDialog(
               title: const Text('Kalıcı olarak sil'),
@@ -828,21 +762,16 @@ class _UsersPageState extends State<UsersPage> {
                 width: 460,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${user.name} sistemden kalıcı olarak silinecek.',
-                      style:
-                          Theme.of(context).textTheme.bodyLarge,
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 12),
                     const Text(
                       'Bu işlem geri alınamaz. Kullanıcının hesabı, departman erişimleri ve yetkileri tamamen kaldırılır.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.danger,
-                      ),
+                      style: TextStyle(fontSize: 13, color: AppColors.danger),
                     ),
                     const SizedBox(height: 18),
                     const Text(
@@ -860,9 +789,7 @@ class _UsersPageState extends State<UsersPage> {
                       },
                       decoration: const InputDecoration(
                         hintText: 'SİL',
-                        prefixIcon: Icon(
-                          Icons.warning_amber_outlined,
-                        ),
+                        prefixIcon: Icon(Icons.warning_amber_outlined),
                       ),
                     ),
                   ],
@@ -885,9 +812,7 @@ class _UsersPageState extends State<UsersPage> {
                     backgroundColor: AppColors.danger,
                     foregroundColor: Colors.white,
                   ),
-                  icon: const Icon(
-                    Icons.delete_forever_outlined,
-                  ),
+                  icon: const Icon(Icons.delete_forever_outlined),
                   label: const Text('Kalıcı Olarak Sil'),
                 ),
               ],
@@ -904,9 +829,7 @@ class _UsersPageState extends State<UsersPage> {
     }
 
     setState(() {
-      _users.removeWhere(
-        (item) => item.id == user.id,
-      );
+      _users.removeWhere((item) => item.id == user.id);
     });
 
     if (!mounted) {
@@ -914,17 +837,11 @@ class _UsersPageState extends State<UsersPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${user.name} kalıcı olarak silindi.',
-        ),
-      ),
+      SnackBar(content: Text('${user.name} kalıcı olarak silindi.')),
     );
   }
 
-  Future<void> _showPasswordResetDialog(
-    AppUser user,
-  ) async {
+  Future<void> _showPasswordResetDialog(AppUser user) async {
     final keyController = TextEditingController();
     bool obscureKey = true;
 
@@ -934,20 +851,16 @@ class _UsersPageState extends State<UsersPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text(
-                'Şifre yenileme anahtarı',
-              ),
+              title: const Text('Şifre yenileme anahtarı'),
               content: SizedBox(
                 width: 440,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${user.name} için geçici bir anahtar belirleyin.',
-                      style:
-                          Theme.of(context).textTheme.bodyMedium,
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 18),
                     TextField(
@@ -956,9 +869,7 @@ class _UsersPageState extends State<UsersPage> {
                       decoration: InputDecoration(
                         labelText: 'Geçici anahtar',
                         hintText: 'En az 8 karakter',
-                        prefixIcon: const Icon(
-                          Icons.key_outlined,
-                        ),
+                        prefixIcon: const Icon(Icons.key_outlined),
                         suffixIcon: IconButton(
                           onPressed: () {
                             setDialogState(() {
@@ -1006,18 +917,14 @@ class _UsersPageState extends State<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere(
-      (item) => item.id == user.id,
-    );
+    final index = _users.indexWhere((item) => item.id == user.id);
 
     if (index == -1) {
       return;
     }
 
     setState(() {
-      _users[index] = user.copyWith(
-        mustChangePassword: true,
-      );
+      _users[index] = user.copyWith(mustChangePassword: true);
     });
   }
 
@@ -1079,9 +986,7 @@ class _UsersPageState extends State<UsersPage> {
 
                 Navigator.of(dialogContext).pop(
                   AppUser(
-                    id: DateTime.now()
-                        .millisecondsSinceEpoch
-                        .toString(),
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
                     name: name,
                     email: email,
                     role: UserRole.user,
@@ -1112,13 +1017,9 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _showEditUserDialog(AppUser user) async {
-    final nameController = TextEditingController(
-      text: user.name,
-    );
+    final nameController = TextEditingController(text: user.name);
 
-    final emailController = TextEditingController(
-      text: user.email,
-    );
+    final emailController = TextEditingController(text: user.email);
 
     final result = await showDialog<AppUser>(
       context: context,
@@ -1164,12 +1065,9 @@ class _UsersPageState extends State<UsersPage> {
                   return;
                 }
 
-                Navigator.of(dialogContext).pop(
-                  user.copyWith(
-                    name: name,
-                    email: email,
-                  ),
-                );
+                Navigator.of(
+                  dialogContext,
+                ).pop(user.copyWith(name: name, email: email));
               },
               child: const Text('Kaydet'),
             ),
@@ -1185,9 +1083,7 @@ class _UsersPageState extends State<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere(
-      (item) => item.id == user.id,
-    );
+    final index = _users.indexWhere((item) => item.id == user.id);
 
     if (index == -1) {
       return;
@@ -1204,13 +1100,10 @@ class _UsersPageState extends State<UsersPage> {
     }
 
     final day = dateTime.day.toString().padLeft(2, '0');
-    final month =
-        dateTime.month.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
     final year = dateTime.year.toString();
-    final hour =
-        dateTime.hour.toString().padLeft(2, '0');
-    final minute =
-        dateTime.minute.toString().padLeft(2, '0');
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
 
     return '$day.$month.$year\n$hour:$minute';
   }
@@ -1237,9 +1130,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -1250,11 +1141,7 @@ class _SummaryCard extends StatelessWidget {
               color: iconColor.withOpacity(0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 22,
-            ),
+            child: Icon(icon, color: iconColor, size: 22),
           ),
           const SizedBox(width: 14),
           Column(
@@ -1286,30 +1173,20 @@ class _SummaryCard extends StatelessWidget {
 class _DepartmentChip extends StatelessWidget {
   final String label;
 
-  const _DepartmentChip({
-    required this.label,
-  });
+  const _DepartmentChip({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 11,
-          color: AppColors.textSecondary,
-        ),
+        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
       ),
     );
   }
@@ -1318,21 +1195,14 @@ class _DepartmentChip extends StatelessWidget {
 class _StatusBadge extends StatelessWidget {
   final bool isActive;
 
-  const _StatusBadge({
-    required this.isActive,
-  });
+  const _StatusBadge({required this.isActive});
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive
-        ? AppColors.success
-        : AppColors.textSecondary;
+    final color = isActive ? AppColors.success : AppColors.textSecondary;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(20),
@@ -1355,10 +1225,7 @@ class _DeletedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.danger.withOpacity(0.10),
         borderRadius: BorderRadius.circular(20),

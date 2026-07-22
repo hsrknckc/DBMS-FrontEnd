@@ -8,3 +8,8 @@ C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/flutter/CMakeFiles
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/CMakeFiles/dmbs_frontend.dir
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/CMakeFiles/INSTALL.dir
 C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/runner/CMakeFiles/ALL_BUILD.dir
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/plugins/jni/CMakeFiles/INSTALL.dir
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/plugins/jni/CMakeFiles/ALL_BUILD.dir
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/plugins/jni/shared/CMakeFiles/jni.dir
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/plugins/jni/shared/CMakeFiles/INSTALL.dir
+C:/Users/iremb/Downloads/DBMS-FrontEnd-main/build/windows/x64/plugins/jni/shared/CMakeFiles/ALL_BUILD.dir

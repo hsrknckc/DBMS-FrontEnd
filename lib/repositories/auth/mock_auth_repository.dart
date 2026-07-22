@@ -27,11 +27,8 @@ class MockAuthRepository implements AuthRepository {
     email: 'mehmet.kaya@company.com',
     role: UserRole.user,
     departments: const {'Sensor', 'Signal'},
-    permissions: const {
-      Permission.databaseView,
-      Permission.dataView,
-      Permission.dataExport,
-    },
+    // TEST: Tüm yetkiler açık — backend bağlandığında API'den gelecek
+    permissions: Permission.values.toSet(),
     isActive: true,
     createdAt: DateTime(2026, 2, 15),
   );

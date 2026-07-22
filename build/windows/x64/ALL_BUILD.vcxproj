@@ -152,6 +152,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{D0EB82A9-3C75-3A18-913A-0DBF23B7F538}</Project>
       <Name>flutter_wrapper_plugin</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\iremb\Downloads\DBMS-FrontEnd-main\build\windows\x64\plugins\jni\shared\jni.vcxproj">
+      <Project>{6A898A5E-0FED-3F9D-81B7-90E8F69DB463}</Project>
+      <Name>jni</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
