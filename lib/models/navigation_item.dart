@@ -4,6 +4,7 @@ enum AppPage {
   dashboard,
   databases,
   dataExplorer,
+  dataTypeExplorer,
   users,
   permissions,
   auditLogs,
