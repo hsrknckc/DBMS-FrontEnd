@@ -326,30 +326,40 @@ class _DataExplorerPageState
   @override
   void initState() {
     super.initState();
+  }
 
-    final databases = _visibleDatabases;
+  void _ensureSelection(List<_ExplorerDatabase> databases) {
+    if (databases.isEmpty) return;
 
-    if (databases.isNotEmpty) {
+    if (_selectedDatabaseId == null ||
+        !databases.any((db) => db.id == _selectedDatabaseId)) {
       if (_lastSelectedDatabaseId != null &&
           databases.any((db) => db.id == _lastSelectedDatabaseId)) {
         _selectedDatabaseId = _lastSelectedDatabaseId;
-        final selectedDb =
-            databases.firstWhere((db) => db.id == _lastSelectedDatabaseId);
-        if (_lastSelectedCollection != null &&
-            selectedDb.collections.contains(_lastSelectedCollection)) {
-          _selectedCollection = _lastSelectedCollection;
-        } else if (selectedDb.collections.isNotEmpty) {
-          _selectedCollection = selectedDb.collections.first;
-        }
       } else {
         _selectedDatabaseId = databases.first.id;
-        if (databases.first.collections.isNotEmpty) {
-          _selectedCollection = databases.first.collections.first;
-        }
       }
-      _lastSelectedDatabaseId = _selectedDatabaseId;
-      _lastSelectedCollection = _selectedCollection;
     }
+
+    final selectedDb = databases.firstWhere(
+      (db) => db.id == _selectedDatabaseId,
+      orElse: () => databases.first,
+    );
+
+    if (_selectedCollection == null ||
+        !selectedDb.collections.contains(_selectedCollection)) {
+      if (_lastSelectedCollection != null &&
+          selectedDb.collections.contains(_lastSelectedCollection)) {
+        _selectedCollection = _lastSelectedCollection;
+      } else if (selectedDb.collections.isNotEmpty) {
+        _selectedCollection = selectedDb.collections.first;
+      } else {
+        _selectedCollection = null;
+      }
+    }
+
+    _lastSelectedDatabaseId = _selectedDatabaseId;
+    _lastSelectedCollection = _selectedCollection;
   }
 
   @override
@@ -363,6 +373,8 @@ class _DataExplorerPageState
     if (!_canView) {
       return _buildAccessDenied();
     }
+
+    _ensureSelection(_visibleDatabases);
 
     final records = _filteredRecords;
 
