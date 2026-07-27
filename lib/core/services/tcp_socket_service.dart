@@ -2,6 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:uuid/uuid.dart';
+
+import '../../models/db_request.dart';
+import '../../models/db_response.dart';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TCP Bağlantı Durumu
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10,7 +15,6 @@ enum TcpConnectionState { disconnected, connecting, connected }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Sunucu Yapılandırması
-// Backend hazır olduğunda bu değerleri güncelle.
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TcpConfig {
@@ -28,41 +32,38 @@ class TcpConfig {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TCP Soket Servisi
-//
-// Protokol: Newline-Delimited JSON
-//   İSTEK  → {"requestId":"<uuid>","action":"<action>","payload":{...}}\n
-//   YANIT  ← {"requestId":"<uuid>","ok":true|false,"data":{...},"error":"..."}\n
-//
-// Özellikler:
-//   • Tek kalıcı TCP bağlantısı (Socket.connect)
-//   • Exponential backoff ile otomatik yeniden bağlanma
-//   • requestId bazlı Completer eşleştirme (request → response)
-//   • Bağlantı durumu Stream'i
+// TCP Soket Servisi (Persist & Multiplexed Async Requests)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TcpSocketService {
   final TcpConfig config;
+  static const _uuid = Uuid();
 
-  TcpSocketService({TcpConfig? config}) : config = config ?? const TcpConfig();
-
-  // ── İç durum ────────────────────────────────────────────────────────────
   Socket? _socket;
   bool _disposed = false;
   bool _reconnecting = false;
+  int _reconnectAttempt = 0;
+  static const int _maxBackoffSeconds = 30;
 
-  /// Bekleyen istekler: requestId → Completer<Map<String,dynamic>>
-  final _pending = <String, Completer<Map<String, dynamic>>>{};
+  /// Bekleyen istekler: requestId ➔ Completer<DbResponse>
+  final Map<String, Completer<DbResponse>> _pendingRequests = {};
 
-  /// Ham mesaj buffer'ı — TCP akışı birden fazla mesajı birleştirebilir.
-  final _buffer = StringBuffer();
+  /// Gelen parçalı TCP mesajlarını newline ('\n') ile birleştiren buffer
+  final StringBuffer _buffer = StringBuffer();
 
-  // ── Bağlantı durumu yayını ──────────────────────────────────────────────
-  final _stateController = StreamController<TcpConnectionState>.broadcast();
+  /// Bağlantı durumu dinleyici akışı (Stream)
+  final StreamController<TcpConnectionState> _stateController =
+      StreamController<TcpConnectionState>.broadcast();
 
+  TcpSocketService({TcpConfig? config}) : config = config ?? const TcpConfig();
+
+  /// Bağlantı durumu akışı
   Stream<TcpConnectionState> get connectionState => _stateController.stream;
 
   TcpConnectionState _currentState = TcpConnectionState.disconnected;
+
+  /// Mevcut bağlantı durumu
+  TcpConnectionState get currentState => _currentState;
 
   void _setState(TcpConnectionState state) {
     _currentState = state;
@@ -71,11 +72,9 @@ class TcpSocketService {
     }
   }
 
-  TcpConnectionState get currentState => _currentState;
+  // ── Bağlantı Yönetimi ──────────────────────────────────────────────────
 
-  // ── Bağlantı ────────────────────────────────────────────────────────────
-
-  /// Sunucuya bağlan. Zaten bağlıysa işlem yapmaz.
+  /// Ham TCP Soket bağlantısı açar. Bağlıysa işlem yapmaz.
   Future<void> connect() async {
     if (_currentState == TcpConnectionState.connected) return;
     if (_disposed) throw StateError('TcpSocketService dispose edildi.');
@@ -89,13 +88,15 @@ class TcpSocketService {
         timeout: config.connectTimeout,
       );
 
+      _reconnectAttempt = 0;
+
       _socket!
           .cast<List<int>>()
           .transform(utf8.decoder)
           .listen(
-            _onData,
-            onError: _onError,
-            onDone: _onDone,
+            _onDataReceived,
+            onError: _onSocketError,
+            onDone: _onSocketDone,
             cancelOnError: false,
           );
 
@@ -106,10 +107,11 @@ class TcpSocketService {
     }
   }
 
-  /// Bağlantıyı kapat ve kaynakları serbest bırak.
+  /// Soket bağlantısını güvenli biçimde kapatır.
   Future<void> disconnect() async {
     _disposed = true;
     _reconnecting = false;
+    _failAllPending('Bağlantı kullanıcı tarafından kapatıldı.');
     await _closeSocket();
     await _stateController.close();
   }
@@ -122,75 +124,62 @@ class TcpSocketService {
     _socket = null;
   }
 
-  // ── Veri Alma (Framing) ─────────────────────────────────────────────────
+  // ── Veri Alma & Çerçeveleme (Framing: '\n') ────────────────────────────
 
-  void _onData(String chunk) {
+  void _onDataReceived(String chunk) {
     _buffer.write(chunk);
-    final raw = _buffer.toString();
+    final content = _buffer.toString();
 
-    // Newline ile ayrılmış mesajları işle
-    final lines = raw.split('\n');
+    // Newline ('\n') ile ayrılmış mesajları böl
+    final lines = content.split('\n');
 
-    // Son eleman tamamlanmamış olabilir — buffer'da tut
+    // Son eleman henüz tamamlanmamış olabilir, buffer'da tut
     _buffer.clear();
     _buffer.write(lines.last);
 
     for (var i = 0; i < lines.length - 1; i++) {
       final line = lines[i].trim();
-      if (line.isEmpty) continue;
-      _processMessage(line);
+      if (line.isNotEmpty) {
+        _processIncomingLine(line);
+      }
     }
   }
 
-  void _processMessage(String raw) {
+  void _processIncomingLine(String line) {
     try {
-      final json = jsonDecode(raw) as Map<String, dynamic>;
-      final requestId = json['requestId'] as String?;
+      final jsonMap = jsonDecode(line) as Map<String, dynamic>;
+      final response = DbResponse.fromJson(jsonMap);
+      final completer = _pendingRequests.remove(response.requestId);
 
-      if (requestId != null && _pending.containsKey(requestId)) {
-        final completer = _pending.remove(requestId)!;
-
-        if (json['ok'] == true) {
-          completer.complete(json);
-        } else {
-          final errorMsg =
-              json['error']?.toString() ?? 'Sunucudan hata yanıtı alındı.';
-          completer.completeError(TcpException(errorMsg, json));
-        }
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(response);
       }
     } catch (e) {
-      // Ayrıştırılamayan mesaj — yoksay, log'la
-      // ignore: avoid_print
-      print('[TcpSocketService] Ayrıştırılamayan mesaj: $raw');
+      // Ayrıştırılamayan mesajlar loglanır
+      print('[TcpSocketService] Yanıt ayrıştırma hatası: $e | Ham Satır: $line');
     }
   }
 
-  void _onError(Object error, StackTrace stack) {
-    // ignore: avoid_print
+  void _onSocketError(Object error) {
     print('[TcpSocketService] Soket hatası: $error');
-    _failAllPending('Soket hatası: $error');
+    _failAllPending('Soket hatası meydana geldi: $error');
     _scheduleReconnect();
   }
 
-  void _onDone() {
+  void _onSocketDone() {
     _setState(TcpConnectionState.disconnected);
-    _failAllPending('Sunucu bağlantıyı kapattı.');
+    _failAllPending('Sunucu bağlantıyı sonlandırdı.');
     _scheduleReconnect();
   }
 
   void _failAllPending(String reason) {
-    for (final completer in _pending.values) {
+    for (final completer in _pendingRequests.values) {
       if (!completer.isCompleted) {
         completer.completeError(TcpException(reason));
       }
     }
-    _pending.clear();
+    _pendingRequests.clear();
   }
-
-  // ── Otomatik Yeniden Bağlanma (Exponential Backoff) ────────────────────
-
-  int _reconnectAttempt = 0;
-  static const _maxBackoffSeconds = 30;
 
   void _scheduleReconnect() {
     if (_disposed || _reconnecting) return;
@@ -198,9 +187,8 @@ class TcpSocketService {
     _setState(TcpConnectionState.disconnected);
     _socket = null;
 
-    final delaySeconds = _backoffDelay();
-    // ignore: avoid_print
-    print('[TcpSocketService] $delaySeconds s sonra yeniden bağlanılıyor...');
+    final delaySeconds = (1 << _reconnectAttempt).clamp(1, _maxBackoffSeconds);
+    print('[TcpSocketService] $delaySeconds saniye sonra yeniden bağlanılacak...');
 
     Future.delayed(Duration(seconds: delaySeconds), () async {
       if (_disposed) return;
@@ -209,84 +197,111 @@ class TcpSocketService {
 
       try {
         await connect();
-        _reconnectAttempt = 0;
       } catch (_) {
         _scheduleReconnect();
       }
     });
   }
 
-  int _backoffDelay() {
-    final delay = 1 << _reconnectAttempt; // 1, 2, 4, 8, 16 ...
-    return delay > _maxBackoffSeconds ? _maxBackoffSeconds : delay;
-  }
+  // ── İstek Gönderme Mimarisi (Completer + Multiplexed) ───────────────────
 
-  // ── İstek Gönderme ──────────────────────────────────────────────────────
-
-  /// Sunucuya bir JSON isteği gönderir ve yanıtı bekler.
-  ///
-  /// [action] : İşlem adı — ör. "auth.login", "users.list"
-  /// [payload]: İstek gövdesi
-  /// [token]  : Varsa Bearer token (her istek taşır)
-  Future<Map<String, dynamic>> send({
-    required String action,
-    Map<String, dynamic> payload = const {},
-    String? token,
-  }) async {
+  /// Bir [DbRequest] paketini tek satırlık JSON + '\n' formatında sunucuya gönderir.
+  /// Yanıt [request.requestId] üzerinden asenkron olarak tamamlanır.
+  Future<DbResponse> sendRequest(DbRequest request) async {
     if (_currentState != TcpConnectionState.connected) {
-      // Bağlı değilse bağlan
       await connect();
     }
 
-    final requestId = _generateId();
-    final message = {
-      'requestId': requestId,
-      'action': action,
-      if (token != null) 'token': token,
-      'payload': payload,
-    };
+    final jsonPayload = jsonEncode(request.toJson());
+    final completer = Completer<DbResponse>();
 
-    final completer = Completer<Map<String, dynamic>>();
-    _pending[requestId] = completer;
+    _pendingRequests[request.requestId] = completer;
 
-    // Gönder — newline ile bitir (framing)
     try {
-      _socket!.write('${jsonEncode(message)}\n');
+      // İstek sonuna '\n' eklenerek gönderilir (Framing Rule 1)
+      _socket!.write('$jsonPayload\n');
     } catch (e) {
-      _pending.remove(requestId);
+      _pendingRequests.remove(request.requestId);
       rethrow;
     }
 
-    // Zaman aşımı
+    // Zaman aşımı yönetimi
     return completer.future.timeout(
       config.requestTimeout,
       onTimeout: () {
-        _pending.remove(requestId);
-        throw TcpException('İstek zaman aşımına uğradı: $action');
+        _pendingRequests.remove(request.requestId);
+        throw TcpException(
+          'İstek zaman aşımına uğradı (${config.requestTimeout.inSeconds}s): ${request.action}',
+        );
       },
     );
   }
 
-  // ── Yardımcılar ─────────────────────────────────────────────────────────
+  /// Yardımcı metot: Parametrelerle hızlıca [DbRequest] oluşturup gönderir.
+  Future<DbResponse> execute({
+    required String action,
+    required String username,
+    required String password,
+    String? database,
+    String? collection,
+    Map<String, dynamic>? filter,
+    Map<String, dynamic>? document,
+    String? requestId,
+  }) async {
+    final req = DbRequest(
+      requestId: requestId ?? _uuid.v4(),
+      action: action,
+      username: username,
+      password: password,
+      database: database,
+      collection: collection,
+      filter: filter,
+      document: document,
+    );
 
-  static int _idCounter = 0;
+    return sendRequest(req);
+  }
 
-  static String _generateId() {
-    _idCounter = (_idCounter + 1) % 0xFFFFFF;
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    return '$ts-${_idCounter.toRadixString(16)}';
+  /// Geriye dönük uyumluluk metodu (Eski repository yapısı için)
+  Future<Map<String, dynamic>> send({
+    required String action,
+    Map<String, dynamic> payload = const {},
+    String? token,
+    String? username,
+    String? password,
+  }) async {
+    final req = DbRequest(
+      requestId: _uuid.v4(),
+      action: action,
+      username: username ?? 'admin',
+      password: password ?? '',
+      database: payload['databaseId']?.toString() ?? payload['database']?.toString(),
+      collection: payload['collectionName']?.toString() ?? payload['collection']?.toString(),
+      filter: payload['filter'] as Map<String, dynamic>?,
+      document: payload['data'] as Map<String, dynamic>? ??
+          payload['document'] as Map<String, dynamic>?,
+    );
+
+    final res = await sendRequest(req);
+    return {
+      'requestId': res.requestId,
+      'ok': res.isOk,
+      'status': res.status,
+      'message': res.message,
+      'data': res.data,
+    };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TCP Özel Hata Sınıfı
+// Özel Hata Sınıfı
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TcpException implements Exception {
   final String message;
-  final Map<String, dynamic>? serverResponse;
+  final DbResponse? response;
 
-  const TcpException(this.message, [this.serverResponse]);
+  const TcpException(this.message, [this.response]);
 
   @override
   String toString() => 'TcpException: $message';

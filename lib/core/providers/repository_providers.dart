@@ -32,6 +32,9 @@ import '../../repositories/dashboard/tcp_dashboard_repository.dart';
 // import '../../repositories/dashboard/http_dashboard_repository.dart';
 
 import '../services/tcp_socket_service.dart';
+import 'socket_provider.dart';
+
+export 'socket_provider.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HTTP Client (Dio) — HTTP katmanı için hazır, şimdilik yorum satırında.
@@ -48,25 +51,8 @@ final dioProvider = Provider<Dio>((ref) {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TCP Soket Servisi
-//
-// Sunucu adresini değiştirmek için TcpConfig'i güncelle:
-//   TcpConfig(host: '192.168.1.100', port: 8080)
-// ═══════════════════════════════════════════════════════════════════════════════
 
-final tcpSocketServiceProvider = Provider<TcpSocketService>((ref) {
-  final service = TcpSocketService(
-    config: const TcpConfig(
-      host: '54.154.220.190', // ← Sunucu IP'sini buraya yaz
-      port: 5150,            // ← Sunucu portunu buraya yaz
-    ),
-  );
-
-  // Provider dispose edildiğinde soketi kapat
-  ref.onDispose(service.disconnect);
-
-  return service;
-});
+final tcpSocketServiceProvider = socketServiceProvider;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ╔══════════════════════════════════════════════════════════════════════════════╗

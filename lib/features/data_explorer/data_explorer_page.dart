@@ -355,13 +355,13 @@ class _DataExplorerPageState
         // SuperAdmin her zaman tam yetkili.
         // Normal kullanıcı için _canImport / _canCreate yoksa butonlar
         // görünür ama disabled + %50 opaklık + Tooltip ile uyarı verir.
-        const _noWriteTooltip =
+        const noWriteTooltip =
             'Bu işlem için yazma yetkiniz bulunmamaktadır.\nYöneticinizle iletişime geçin.';
 
         Widget importBtn = Opacity(
           opacity: _canImport ? 1.0 : 0.5,
           child: Tooltip(
-            message: _canImport ? '' : _noWriteTooltip,
+            message: _canImport ? '' : noWriteTooltip,
             child: OutlinedButton.icon(
               onPressed: _canImport && _hasSelection && !_isImporting
                   ? _pickAndImportJson
@@ -381,7 +381,7 @@ class _DataExplorerPageState
         Widget createBtn = Opacity(
           opacity: _canCreate ? 1.0 : 0.5,
           child: Tooltip(
-            message: _canCreate ? '' : _noWriteTooltip,
+            message: _canCreate ? '' : noWriteTooltip,
             child: ElevatedButton.icon(
               onPressed: _canCreate && _hasSelection
                   ? _showCreateRecordDialog

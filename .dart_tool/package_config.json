@@ -104,6 +104,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "fixnum",
+      "rootUri": "file:///D:/flutter_depo/hosted/pub.dev/fixnum-1.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
+    },
+    {
       "name": "flutter",
       "rootUri": "file:///C:/Users/iremb/Dev/flutter/packages/flutter",
       "packageUri": "lib/",
@@ -168,6 +174,12 @@
       "rootUri": "file:///D:/flutter_depo/hosted/pub.dev/jni_flutter-1.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.3"
+    },
+    {
+      "name": "json_annotation",
+      "rootUri": "file:///D:/flutter_depo/hosted/pub.dev/json_annotation-4.12.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
     },
     {
       "name": "leak_tracker",
@@ -408,6 +420,12 @@
       "rootUri": "file:///D:/flutter_depo/hosted/pub.dev/typed_data-1.4.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
+    },
+    {
+      "name": "uuid",
+      "rootUri": "file:///D:/flutter_depo/hosted/pub.dev/uuid-4.6.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "vector_math",
