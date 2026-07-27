@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/database_item.dart';
 import '../../models/permission.dart';
+import 'controllers/databases_notifier.dart';
 
-class DatabasesPage extends StatefulWidget {
+class DatabasesPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
 
   const DatabasesPage({
@@ -14,10 +16,10 @@ class DatabasesPage extends StatefulWidget {
   });
 
   @override
-  State<DatabasesPage> createState() => _DatabasesPageState();
+  ConsumerState<DatabasesPage> createState() => _DatabasesPageState();
 }
 
-class _DatabasesPageState extends State<DatabasesPage> {
+class _DatabasesPageState extends ConsumerState<DatabasesPage> {
   final TextEditingController _searchController =
       TextEditingController();
 
@@ -27,66 +29,10 @@ class _DatabasesPageState extends State<DatabasesPage> {
   /// 1: Silinen database'ler
   int _viewFilter = 0;
 
-  final List<DatabaseItem> _databases = [
-    DatabaseItem(
-      id: 'db-1',
-      name: 'sensor_database',
-      department: 'Sensor',
-      description:
-          'Sensör cihazlarından gelen ölçüm ve durum verilerini içerir.',
-      collectionCount: 4,
-      recordCount: 42580,
-      createdAt: DateTime(2026, 7, 1, 9, 0),
-      updatedAt: DateTime(2026, 7, 15, 13, 40),
-    ),
-    DatabaseItem(
-      id: 'db-2',
-      name: 'signal_database',
-      department: 'Signal',
-      description:
-          'Sinyal kayıtları ve analiz sonuçlarının tutulduğu database.',
-      collectionCount: 3,
-      recordCount: 18940,
-      createdAt: DateTime(2026, 7, 3, 10, 30),
-      updatedAt: DateTime(2026, 7, 15, 11, 15),
-    ),
-    DatabaseItem(
-      id: 'db-3',
-      name: 'acoustic_database',
-      department: 'Acoustic',
-      description:
-          'Akustik ölçüm verileri ve işlenmiş sonuçları içerir.',
-      collectionCount: 6,
-      recordCount: 78320,
-      createdAt: DateTime(2026, 6, 25, 14, 20),
-      updatedAt: DateTime(2026, 7, 14, 17, 50),
-    ),
-    DatabaseItem(
-      id: 'db-4',
-      name: 'sonar_archive',
-      department: 'Sonar',
-      description:
-          'Arşivlenmiş sonar verilerinin tutulduğu database.',
-      collectionCount: 2,
-      recordCount: 12500,
-      createdAt: DateTime(2026, 6, 18, 12, 10),
-      updatedAt: DateTime(2026, 7, 10, 16, 25),
-    ),
-    DatabaseItem(
-      id: 'db-5',
-      name: 'old_test_database',
-      department: 'Test',
-      description:
-          'Eski test kayıtlarının tutulduğu silinmiş database.',
-      collectionCount: 1,
-      recordCount: 840,
-      createdAt: DateTime(2026, 5, 12, 8, 30),
-      updatedAt: DateTime(2026, 6, 20, 15, 0),
-      isDeleted: true,
-      deletedAt: DateTime(2026, 7, 12, 10, 45),
-      deletedBy: 'Ayşe Yılmaz',
-    ),
-  ];
+  List<DatabaseItem> get _databases {
+    final dbState = ref.watch(databasesProvider);
+    return dbState.valueOrNull ?? [];
+  }
 
   List<String> get _departments {
     final departments = _databases
@@ -566,21 +512,26 @@ class _DatabasesPageState extends State<DatabasesPage> {
       return;
     }
 
-    setState(() {
-      _databases.add(result);
-    });
-
-    if (!mounted) {
-      return;
+    try {
+      await ref.read(databasesProvider.notifier).createDatabase(
+        name: result.name,
+        department: result.department,
+        description: result.description,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${result.name} oluşturuldu.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${result.name} oluşturuldu.',
-        ),
-      ),
-    );
   }
 
   Future<void> _showDatabaseDetails(
@@ -684,39 +635,28 @@ class _DatabasesPageState extends State<DatabasesPage> {
       return;
     }
 
-    final index = _databases.indexWhere(
-      (item) => item.id == database.id,
-    );
-
-    if (index == -1) {
-      return;
-    }
-
-    setState(() {
-      _databases[index] = database.copyWith(
-        isDeleted: true,
-        deletedAt: DateTime.now(),
-        deletedBy: widget.currentUser.name,
+    try {
+      await ref.read(databasesProvider.notifier).softDelete(database.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${database.name} silinenlere taşındı.',
+          ),
+          action: SnackBarAction(
+            label: 'Geri Al',
+            onPressed: () {
+              _restoreDatabase(database.id);
+            },
+          ),
+        ),
       );
-    });
-
-    if (!mounted) {
-      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${database.name} silinenlere taşındı.',
-        ),
-        action: SnackBarAction(
-          label: 'Geri Al',
-          onPressed: () {
-            _restoreDatabase(database.id);
-          },
-        ),
-      ),
-    );
   }
 
   Future<void> _showRestoreDialog(
@@ -750,29 +690,23 @@ class _DatabasesPageState extends State<DatabasesPage> {
     );
 
     if (shouldRestore == true) {
-      _restoreDatabase(database.id);
+      await _restoreDatabase(database.id);
     }
   }
 
-  void _restoreDatabase(String databaseId) {
-    final index = _databases.indexWhere(
-      (item) => item.id == databaseId,
-    );
-
-    if (index == -1) {
-      return;
-    }
-
-    final database = _databases[index];
-
-    setState(() {
-      _databases[index] = database.copyWith(
-        isDeleted: false,
-        clearDeletedAt: true,
-        clearDeletedBy: true,
-        updatedAt: DateTime.now(),
+  Future<void> _restoreDatabase(String databaseId) async {
+    try {
+      await ref.read(databasesProvider.notifier).restore(databaseId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Database geri yüklendi.')),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
+    }
   }
 
   Future<void> _showPermanentDeleteDialog(
@@ -862,11 +796,18 @@ class _DatabasesPageState extends State<DatabasesPage> {
       return;
     }
 
-    setState(() {
-      _databases.removeWhere(
-        (item) => item.id == database.id,
+    try {
+      await ref.read(databasesProvider.notifier).permanentlyDelete(database.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${database.name} kalıcı olarak silindi.')),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
+    }
   }
 
   String _formatDateTime(DateTime dateTime) {
