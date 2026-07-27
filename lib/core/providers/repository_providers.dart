@@ -57,8 +57,8 @@ final dioProvider = Provider<Dio>((ref) {
 final tcpSocketServiceProvider = Provider<TcpSocketService>((ref) {
   final service = TcpSocketService(
     config: const TcpConfig(
-      host: '54.154.220.190', // ← Sunucu IP'sini buraya yaz
-      port: 5150,            // ← Sunucu portunu buraya yaz
+      host: '54.154.220.190', // ← Sunucu IP'si (AWS)
+      port: 5150,            // ← Sunucu portu
     ),
   );
 
