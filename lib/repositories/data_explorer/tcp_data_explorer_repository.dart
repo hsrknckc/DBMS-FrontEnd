@@ -34,8 +34,11 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
       },
       token: _tokenProvider(),
     );
-    final list =
-        (response['data'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final rawData = response['data'];
+    if (rawData == null || rawData is! List) {
+      return [];
+    }
+    final list = rawData.cast<Map<String, dynamic>>();
     return list.map(DataRecord.fromJson).toList();
   }
 

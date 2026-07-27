@@ -216,6 +216,20 @@ class _DataExplorerPageState
 
     _lastSelectedDatabaseId = _selectedDatabaseId;
     _lastSelectedCollection = _selectedCollection;
+
+    final currentRefDb = ref.read(selectedDatabaseIdProvider);
+    final currentRefCol = ref.read(selectedCollectionProvider);
+    if (currentRefDb != _selectedDatabaseId ||
+        currentRefCol != _selectedCollection) {
+      Future.microtask(() {
+        if (mounted) {
+          ref.read(selectedDatabaseIdProvider.notifier).state =
+              _selectedDatabaseId;
+          ref.read(selectedCollectionProvider.notifier).state =
+              _selectedCollection;
+        }
+      });
+    }
   }
 
   @override
@@ -411,6 +425,10 @@ class _DataExplorerPageState
                       _lastSelectedDatabaseId = _selectedDatabaseId;
                       _lastSelectedCollection = _selectedCollection;
                     });
+                    ref.read(selectedDatabaseIdProvider.notifier).state =
+                        _selectedDatabaseId;
+                    ref.read(selectedCollectionProvider.notifier).state =
+                        _selectedCollection;
                   },
                 ),
               ),
@@ -441,6 +459,8 @@ class _DataExplorerPageState
                             _searchController.clear();
                             _lastSelectedCollection = value;
                           });
+                          ref.read(selectedCollectionProvider.notifier).state =
+                              value;
                         },
                       ),
                     ),
