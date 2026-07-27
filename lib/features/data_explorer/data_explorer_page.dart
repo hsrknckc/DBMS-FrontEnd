@@ -1,13 +1,17 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/data_record.dart';
 import '../../models/permission.dart';
+
+enum RecordFieldType { string, number, boolean, nullValue }
 
 class DataExplorerPage extends StatefulWidget {
   final AppUser currentUser;
@@ -24,6 +28,9 @@ class DataExplorerPage extends StatefulWidget {
 
 class _DataExplorerPageState
     extends State<DataExplorerPage> {
+  static String? _lastSelectedDatabaseId;
+  static String? _lastSelectedCollection;
+
   final TextEditingController _searchController =
       TextEditingController();
 
@@ -33,7 +40,7 @@ class _DataExplorerPageState
   bool _showJsonView = false;
   bool _isImporting = false;
 
-  final List<_ExplorerDatabase> _databases = const [
+  final List<_ExplorerDatabase> _databases = [
     _ExplorerDatabase(
       id: 'db-1',
       name: 'sensor_database',
@@ -168,11 +175,24 @@ class _DataExplorerPageState
       return _databases;
     }
 
-    return _databases.where((database) {
-      return widget.currentUser.canAccessDepartment(
-        database.department,
+    return _databases.map((database) {
+      if (!widget.currentUser.canAccessDepartment(database.department)) {
+        return null;
+      }
+      
+      final allowedCols = database.collections.where((col) {
+        return widget.currentUser.canAccessCollection(database.department, col);
+      }).toList();
+      
+      if (allowedCols.isEmpty) return null;
+      
+      return _ExplorerDatabase(
+        id: database.id,
+        name: database.name,
+        department: database.department,
+        collections: allowedCols,
       );
-    }).toList();
+    }).whereType<_ExplorerDatabase>().toList();
   }
 
   _ExplorerDatabase? get _selectedDatabase {
@@ -261,11 +281,13 @@ class _DataExplorerPageState
         );
   }
 
+  // Export yetkisi: tüm kullanıcılar dışa aktarabilir; _canExport
+  // tutuldu ama PopupMenuButton üzerinden erişim direkt olduğundan
+  // bu getter referans edilmiyor — ileride ihtiyaç duyulursa kullanılır.
+  // ignore: unused_element
   bool get _canExport {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataExport,
-        );
+        widget.currentUser.hasPermission(Permission.dataExport);
   }
 
   bool get _hasSelection {
@@ -280,12 +302,25 @@ class _DataExplorerPageState
     final databases = _visibleDatabases;
 
     if (databases.isNotEmpty) {
-      _selectedDatabaseId = databases.first.id;
-
-      if (databases.first.collections.isNotEmpty) {
-        _selectedCollection =
-            databases.first.collections.first;
+      if (_lastSelectedDatabaseId != null &&
+          databases.any((db) => db.id == _lastSelectedDatabaseId)) {
+        _selectedDatabaseId = _lastSelectedDatabaseId;
+        final selectedDb =
+            databases.firstWhere((db) => db.id == _lastSelectedDatabaseId);
+        if (_lastSelectedCollection != null &&
+            selectedDb.collections.contains(_lastSelectedCollection)) {
+          _selectedCollection = _lastSelectedCollection;
+        } else if (selectedDb.collections.isNotEmpty) {
+          _selectedCollection = selectedDb.collections.first;
+        }
+      } else {
+        _selectedDatabaseId = databases.first.id;
+        if (databases.first.collections.isNotEmpty) {
+          _selectedCollection = databases.first.collections.first;
+        }
       }
+      _lastSelectedDatabaseId = _selectedDatabaseId;
+      _lastSelectedCollection = _selectedCollection;
     }
   }
 
@@ -347,41 +382,51 @@ class _DataExplorerPageState
           ],
         );
 
+        // ── Yazma yetkisi kontrolü ──────────────────────────────────────────
+        // SuperAdmin her zaman tam yetkili.
+        // Normal kullanıcı için _canImport / _canCreate yoksa butonlar
+        // görünür ama disabled + %50 opaklık + Tooltip ile uyarı verir.
+        const noWriteTooltip =
+            'Bu işlem için yazma yetkiniz bulunmamaktadır.\nYöneticinizle iletişime geçin.';
+
+        Widget importBtn = Opacity(
+          opacity: _canImport ? 1.0 : 0.5,
+          child: Tooltip(
+            message: _canImport ? '' : noWriteTooltip,
+            child: OutlinedButton.icon(
+              onPressed: _canImport && _hasSelection && !_isImporting
+                  ? _pickAndImportJson
+                  : null,
+              icon: _isImporting
+                  ? const SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload_file_outlined),
+              label: Text(_isImporting ? 'Dosya okunuyor' : 'JSON İçe Aktar'),
+            ),
+          ),
+        );
+
+        Widget createBtn = Opacity(
+          opacity: _canCreate ? 1.0 : 0.5,
+          child: Tooltip(
+            message: _canCreate ? '' : noWriteTooltip,
+            child: ElevatedButton.icon(
+              onPressed: _canCreate && _hasSelection
+                  ? _showCreateRecordDialog
+                  : null,
+              icon: const Icon(Icons.add),
+              label: const Text('Yeni Kayıt'),
+            ),
+          ),
+        );
+
         final actions = Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: [
-            if (_canImport)
-              OutlinedButton.icon(
-                onPressed: _hasSelection && !_isImporting
-                    ? _pickAndImportJson
-                    : null,
-                icon: _isImporting
-                    ? const SizedBox(
-                        width: 17,
-                        height: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.upload_file_outlined,
-                      ),
-                label: Text(
-                  _isImporting
-                      ? 'Dosya okunuyor'
-                      : 'JSON İçe Aktar',
-                ),
-              ),
-            if (_canCreate)
-              ElevatedButton.icon(
-                onPressed: _hasSelection
-                    ? _showCreateRecordDialog
-                    : null,
-                icon: const Icon(Icons.add),
-                label: const Text('Yeni Kayıt'),
-              ),
-          ],
+          children: [importBtn, createBtn],
         );
 
         if (isNarrow) {
@@ -467,41 +512,62 @@ class _DataExplorerPageState
                               : database
                                   .collections.first;
                       _searchController.clear();
+                      _lastSelectedDatabaseId = _selectedDatabaseId;
+                      _lastSelectedCollection = _selectedCollection;
                     });
                   },
                 ),
               ),
               SizedBox(
-                width: isNarrow
-                    ? constraints.maxWidth
-                    : 280,
-                child:
-                    DropdownButtonFormField<String>(
-                  value: _selectedCollection,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Collection',
-                    prefixIcon:
-                        Icon(Icons.folder_outlined),
-                  ),
-                  items: (_selectedDatabase
-                              ?.collections ??
-                          [])
-                      .map((collection) {
-                    return DropdownMenuItem<String>(
-                      value: collection,
-                      child: Text(
-                        collection,
-                        overflow: TextOverflow.ellipsis,
+                width: isNarrow ? constraints.maxWidth : 340,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedCollection,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Collection',
+                          prefixIcon: Icon(Icons.folder_outlined),
+                        ),
+                        items: (_selectedDatabase?.collections ?? []).map((collection) {
+                          return DropdownMenuItem<String>(
+                            value: collection,
+                            child: Text(
+                              collection,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCollection = value;
+                            _searchController.clear();
+                            _lastSelectedCollection = value;
+                          });
+                        },
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCollection = value;
-                      _searchController.clear();
-                    });
-                  },
+                    ),
+                    if (_canCreate && _selectedDatabase != null) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Yeni Collection Ekle',
+                        child: InkWell(
+                          onTap: _showAddCollectionDialog,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                            ),
+                            child: const Icon(Icons.add, color: AppColors.primary, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (_selectedDatabase != null)
@@ -579,15 +645,45 @@ class _DataExplorerPageState
                 icon: Icons.description_outlined,
                 text: '$recordCount kayıt',
               ),
-              if (_canExport)
-                OutlinedButton.icon(
-                  onPressed: recordCount == 0
-                      ? null
-                      : _showExportDialog,
-                  icon:
-                      const Icon(Icons.download_outlined),
-                  label: const Text('Dışa Aktar'),
+              // Export: tüm kullanıcılar görebilir.
+              // PopupMenuButton ile format seçimi yapılır.
+              PopupMenuButton<String>(
+                enabled: recordCount > 0,
+                tooltip: recordCount == 0
+                    ? 'Dışa aktarılacak kayıt yok'
+                    : 'Dışa Aktar',
+                offset: const Offset(0, 44),
+                onSelected: _exportWithFormat,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'JSON',
+                    child: Row(
+                      children: [
+                        Icon(Icons.data_object, size: 18),
+                        SizedBox(width: 10),
+                        Text('JSON Formatında İndir'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'CSV',
+                    child: Row(
+                      children: [
+                        Icon(Icons.table_chart_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('CSV Formatında İndir'),
+                      ],
+                    ),
+                  ),
+                ],
+                child: IgnorePointer(
+                  child: OutlinedButton.icon(
+                    onPressed: recordCount == 0 ? null : () {},
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Dışa Aktar'),
+                  ),
                 ),
+              ),
             ],
           );
 
@@ -700,41 +796,50 @@ class _DataExplorerPageState
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: 'Detay',
+                              tooltip: _canUpdate
+                                  ? 'Detay'
+                                  : 'Detay (Sadece Okunabilir)',
                               onPressed: () {
                                 _showRecordDetails(
                                   record,
+                                  readOnly: !_canUpdate,
                                 );
                               },
                               icon: const Icon(
                                 Icons.visibility_outlined,
                               ),
                             ),
-                            if (_canUpdate)
-                              IconButton(
-                                tooltip: 'Düzenle',
-                                onPressed: () {
-                                  _showEditRecordDialog(
-                                    record,
-                                  );
-                                },
-                                icon: const Icon(
-                                  Icons.edit_outlined,
+                            Opacity(
+                              opacity: _canUpdate ? 1.0 : 0.5,
+                              child: Tooltip(
+                                message: _canUpdate
+                                    ? 'Düzenle'
+                                    : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                                child: IconButton(
+                                  onPressed: _canUpdate
+                                      ? () => _showEditRecordDialog(record)
+                                      : null,
+                                  icon: const Icon(Icons.edit_outlined),
                                 ),
                               ),
-                            if (_canDelete)
-                              IconButton(
-                                tooltip: 'Sil',
-                                onPressed: () {
-                                  _showDeleteDialog(
-                                    record,
-                                  );
-                                },
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: AppColors.danger,
+                            ),
+                            Opacity(
+                              opacity: _canDelete ? 1.0 : 0.5,
+                              child: Tooltip(
+                                message: _canDelete
+                                    ? 'Sil'
+                                    : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                                child: IconButton(
+                                  onPressed: _canDelete
+                                      ? () => _showDeleteDialog(record)
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: AppColors.danger,
+                                  ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -810,27 +915,37 @@ class _DataExplorerPageState
                         Icons.visibility_outlined,
                       ),
                     ),
-                    if (_canUpdate)
-                      IconButton(
-                        tooltip: 'Düzenle',
-                        onPressed: () {
-                          _showEditRecordDialog(record);
-                        },
-                        icon: const Icon(
-                          Icons.edit_outlined,
+                    Opacity(
+                      opacity: _canUpdate ? 1.0 : 0.5,
+                      child: Tooltip(
+                        message: _canUpdate
+                            ? 'Düzenle'
+                            : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                        child: IconButton(
+                          onPressed: _canUpdate
+                              ? () => _showEditRecordDialog(record)
+                              : null,
+                          icon: const Icon(Icons.edit_outlined),
                         ),
                       ),
-                    if (_canDelete)
-                      IconButton(
-                        tooltip: 'Sil',
-                        onPressed: () {
-                          _showDeleteDialog(record);
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: AppColors.danger,
+                    ),
+                    Opacity(
+                      opacity: _canDelete ? 1.0 : 0.5,
+                      child: Tooltip(
+                        message: _canDelete
+                            ? 'Sil'
+                            : 'Bu işlem için yazma yetkiniz bulunmamaktadır.',
+                        child: IconButton(
+                          onPressed: _canDelete
+                              ? () => _showDeleteDialog(record)
+                              : null,
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.danger,
+                          ),
                         ),
                       ),
+                    ),
                   ],
                 ),
                 const Divider(),
@@ -1238,20 +1353,24 @@ class _DataExplorerPageState
   }
 
   Future<void> _showCreateRecordDialog() async {
-    final jsonController = TextEditingController(
-      text: const JsonEncoder.withIndent(' ').convert({
-        'fieldName': 'value',
-      }),
-    );
+    final existingKeys = <String>{};
+    for (var r in _records.where((r) => r.databaseId == _selectedDatabaseId && r.collectionName == _selectedCollection)) {
+      existingKeys.addAll(r.data.keys);
+    }
+    
+    final initialData = <String, dynamic>{};
+    for (var key in existingKeys) {
+      initialData[key] = '';
+    }
+    if (initialData.isEmpty) {
+      initialData['yeni_alan'] = '';
+    }
 
-    final result =
-        await _showJsonEditorDialog(
+    final result = await _showRecordEditorDialog(
       title: 'Yeni Kayıt',
-      controller: jsonController,
+      initialData: initialData,
       saveButtonText: 'Kaydet',
     );
-
-    jsonController.dispose();
 
     if (result == null || !_hasSelection) {
       return;
@@ -1288,19 +1407,11 @@ class _DataExplorerPageState
   Future<void> _showEditRecordDialog(
     DataRecord record,
   ) async {
-    final jsonController = TextEditingController(
-      text: const JsonEncoder.withIndent(' ')
-          .convert(record.data),
-    );
-
-    final result =
-        await _showJsonEditorDialog(
+    final result = await _showRecordEditorDialog(
       title: 'Kaydı Düzenle',
-      controller: jsonController,
+      initialData: record.data,
       saveButtonText: 'Değişiklikleri Kaydet',
     );
-
-    jsonController.dispose();
 
     if (result == null) {
       return;
@@ -1322,68 +1433,267 @@ class _DataExplorerPageState
     });
   }
 
-  Future<Map<String, dynamic>?>
-      _showJsonEditorDialog({
+  Future<Map<String, dynamic>?> _showRecordEditorDialog({
     required String title,
-    required TextEditingController controller,
+    required Map<String, dynamic> initialData,
     required String saveButtonText,
   }) {
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) {
         String? errorMessage;
+        bool isJsonMode = false;
+        
+        final formData = Map<String, dynamic>.from(initialData);
+        final controllers = <String, TextEditingController>{};
+        final types = <String, RecordFieldType>{};
+        
+        void initField(String key, dynamic val) {
+           if (val == null) {
+              types[key] = RecordFieldType.nullValue;
+              controllers[key] = TextEditingController(text: 'null');
+           } else if (val is bool) {
+              types[key] = RecordFieldType.boolean;
+              controllers[key] = TextEditingController(text: val.toString());
+           } else if (val is num) {
+              types[key] = RecordFieldType.number;
+              controllers[key] = TextEditingController(text: val.toString());
+           } else if (val is Map || val is List) {
+              types[key] = RecordFieldType.string;
+              controllers[key] = TextEditingController(text: jsonEncode(val));
+           } else {
+              types[key] = RecordFieldType.string;
+              controllers[key] = TextEditingController(text: val.toString());
+           }
+        }
+
+        for (var key in formData.keys) {
+          initField(key, formData[key]);
+        }
+        
+        final jsonController = TextEditingController(
+          text: const JsonEncoder.withIndent(' ').convert(formData),
+        );
+        
+        final newKeyController = TextEditingController();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            
+            void syncToJson() {
+              for (var key in controllers.keys) {
+                final type = types[key]!;
+                final text = controllers[key]!.text.trim();
+                
+                if (type == RecordFieldType.nullValue) {
+                  formData[key] = null;
+                } else if (type == RecordFieldType.boolean) {
+                  formData[key] = (text == 'true');
+                } else if (type == RecordFieldType.number) {
+                  formData[key] = num.tryParse(text) ?? 0;
+                } else {
+                  formData[key] = text;
+                }
+              }
+              jsonController.text = const JsonEncoder.withIndent(' ').convert(formData);
+            }
+            
+            void syncToForm() {
+               try {
+                  final decoded = jsonDecode(jsonController.text);
+                  if (decoded is! Map<String, dynamic>) throw const FormatException();
+                  
+                  formData.clear();
+                  formData.addAll(decoded);
+                  controllers.clear();
+                  types.clear();
+                  for (var key in formData.keys) {
+                    initField(key, formData[key]);
+                  }
+                  errorMessage = null;
+               } catch (e) {
+                  errorMessage = 'Geçersiz JSON formatı';
+               }
+            }
+
             return AlertDialog(
-              title: Text(title),
-              content: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 620,
-                ),
-                child: TextField(
-                  controller: controller,
-                  minLines: 10,
-                  maxLines: 17,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(title),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, icon: Icon(Icons.list), label: Text('Form')),
+                      ButtonSegment(value: true, icon: Icon(Icons.data_object), label: Text('JSON')),
+                    ],
+                    selected: {isJsonMode},
+                    onSelectionChanged: (val) {
+                      setDialogState(() {
+                        if (isJsonMode) {
+                          syncToForm();
+                          if (errorMessage != null) return;
+                        } else {
+                          syncToJson();
+                        }
+                        isJsonMode = val.first;
+                      });
+                    },
                   ),
-                  decoration: InputDecoration(
-                    labelText: 'JSON',
-                    alignLabelWithHint: true,
-                    errorText: errorMessage,
-                  ),
-                ),
+                ],
               ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620, maxHeight: 550),
+                child: isJsonMode 
+                  ? TextField(
+                      controller: jsonController,
+                      minLines: 15,
+                      maxLines: 20,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'JSON',
+                        alignLabelWithHint: true,
+                        errorText: errorMessage,
+                        border: const OutlineInputBorder(),
+                      ),
+                    )
+                  : SizedBox(
+                      width: double.maxFinite,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: controllers.isEmpty 
+                              ? const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(child: Text('Gösterilecek alan yok (Koleksiyon boş)')),
+                                )
+                              : ListView(
+                                  shrinkWrap: true,
+                                  children: controllers.entries.map((e) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12.0),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2, 
+                                          child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        DropdownButton<RecordFieldType>(
+                                           value: types[e.key],
+                                           isDense: true,
+                                           underline: const SizedBox(),
+                                           onChanged: (val) {
+                                              if (val != null) {
+                                                 setDialogState(() {
+                                                    types[e.key] = val;
+                                                    if (val == RecordFieldType.boolean) {
+                                                      e.value.text = 'true';
+                                                    } else if (val == RecordFieldType.nullValue) {
+                                                      e.value.text = 'null';
+                                                    }
+                                                 });
+                                              }
+                                           },
+                                           items: const [
+                                              DropdownMenuItem(value: RecordFieldType.string, child: Text('String', style: TextStyle(fontSize: 13))),
+                                              DropdownMenuItem(value: RecordFieldType.number, child: Text('Number', style: TextStyle(fontSize: 13))),
+                                              DropdownMenuItem(value: RecordFieldType.boolean, child: Text('Boolean', style: TextStyle(fontSize: 13))),
+                                              DropdownMenuItem(value: RecordFieldType.nullValue, child: Text('Null', style: TextStyle(fontSize: 13))),
+                                           ],
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 3,
+                                          child: types[e.key] == RecordFieldType.boolean
+                                              ? DropdownButtonFormField<String>(
+                                                  value: (e.value.text == 'true' || e.value.text == 'false') ? e.value.text : 'true',
+                                                  decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'true', child: Text('True')),
+                                                    DropdownMenuItem(value: 'false', child: Text('False')),
+                                                  ],
+                                                  onChanged: (val) {
+                                                    if (val != null) e.value.text = val;
+                                                  }
+                                                )
+                                              : TextField(
+                                                  controller: e.value,
+                                                  enabled: types[e.key] != RecordFieldType.nullValue,
+                                                  decoration: const InputDecoration(
+                                                    isDense: true,
+                                                    border: OutlineInputBorder(),
+                                                  )
+                                                )
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                          onPressed: () {
+                                            setDialogState(() {
+                                              controllers.remove(e.key);
+                                              types.remove(e.key);
+                                              formData.remove(e.key);
+                                            });
+                                          }
+                                        )
+                                      ],
+                                    )
+                                  );
+                                }).toList(),
+                              )
+                        ),
+                        const Divider(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: newKeyController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Yeni Alan (Key)',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                )
+                              )
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.add),
+                              label: const Text('Ekle'),
+                              onPressed: () {
+                                final k = newKeyController.text.trim();
+                                if (k.isNotEmpty && !controllers.containsKey(k)) {
+                                  setDialogState(() {
+                                    formData[k] = '';
+                                    types[k] = RecordFieldType.string;
+                                    controllers[k] = TextEditingController();
+                                    newKeyController.clear();
+                                  });
+                                }
+                              }
+                            )
+                          ],
+                        )
+                      ],
+                    ), // end of Column
+                  ), // end of SizedBox
+              ), // end of ConstrainedBox
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('İptal'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    try {
-                      final decoded =
-                          jsonDecode(controller.text);
-
-                      if (decoded is! Map) {
-                        throw const FormatException();
+                    if (isJsonMode) {
+                      syncToForm();
+                      if (errorMessage != null) {
+                        setDialogState((){});
+                        return;
                       }
-
-                      Navigator.of(dialogContext).pop(
-                        Map<String, dynamic>.from(
-                          decoded,
-                        ),
-                      );
-                    } catch (_) {
-                      setDialogState(() {
-                        errorMessage =
-                            'Geçerli bir JSON nesnesi girin.';
-                      });
+                    } else {
+                      syncToJson();
                     }
+                    Navigator.of(dialogContext).pop(formData);
                   },
                   child: Text(saveButtonText),
                 ),
@@ -1441,23 +1751,51 @@ class _DataExplorerPageState
   }
 
   Future<void> _showRecordDetails(
-    DataRecord record,
-  ) async {
+    DataRecord record, {
+    bool readOnly = false,
+  }) async {
     final jsonText =
         const JsonEncoder.withIndent('  ').convert({
       '_id': record.id,
       ...record.data,
-      '_createdAt':
-          record.createdAt.toIso8601String(),
-      '_updatedAt':
-          record.updatedAt.toIso8601String(),
+      '_createdAt': record.createdAt.toIso8601String(),
+      '_updatedAt': record.updatedAt.toIso8601String(),
     });
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(record.id),
+          title: Row(
+            children: [
+              Expanded(child: Text(record.id, overflow: TextOverflow.ellipsis)),
+              if (readOnly) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, size: 13, color: AppColors.warning),
+                      SizedBox(width: 4),
+                      Text(
+                        'Sadece Okunabilir',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: 650,
@@ -1476,9 +1814,7 @@ class _DataExplorerPageState
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Kapat'),
             ),
           ],
@@ -1487,47 +1823,97 @@ class _DataExplorerPageState
     );
   }
 
-  Future<void> _showExportDialog() async {
-    final format = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Dışa Aktar'),
-          content: const Text(
-            'Kayıtları hangi formatta dışa aktarmak istiyorsunuz?',
+  // ── Export: Format seçimi PopupMenu'den gelir ─────────────────────────────
+  Future<void> _exportWithFormat(String format) async {
+    final records = _filteredRecords;
+    if (records.isEmpty) return;
+
+    final collectionName = _selectedCollection ?? 'export';
+    final ext = format.toLowerCase(); // 'json' veya 'csv'
+    final defaultFileName = '${collectionName}.$ext';
+
+    String? initialDir;
+    try {
+      final downloads = await getDownloadsDirectory();
+      initialDir = downloads?.path;
+    } catch (_) {}
+
+    // İsim veya tip değiştirmeyi yasaklamak için sadece "Klasör Seçimi" yapıyoruz
+    final selectedDirectory = await FilePicker.getDirectoryPath(
+      dialogTitle: '$format dosyasının kaydedileceği klasörü seçin',
+      initialDirectory: initialDir,
+    );
+
+    if (selectedDirectory == null) return; // Kullanıcı iptal etti
+    if (!mounted) return;
+
+    final savePath = '$selectedDirectory${Platform.pathSeparator}$defaultFileName';
+
+    try {
+      final content = format == 'JSON'
+          ? _buildJsonExport(records)
+          : _buildCsvExport(records);
+
+      await File(savePath).writeAsString(content, flush: true);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${records.length} kayıt $format olarak kaydedildi:\n$savePath',
           ),
-          actions: [
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop('CSV');
-              },
-              icon:
-                  const Icon(Icons.table_chart_outlined),
-              label: const Text('CSV'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop('JSON');
-              },
-              icon: const Icon(Icons.data_object),
-              label: const Text('JSON'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (format == null || !mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$format dışa aktarma işlemi backend bağlantısıyla dosya oluşturacak.',
+          duration: const Duration(seconds: 6),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorMessage('Dosya yazılamadı: $e');
+    }
+  }
+
+  String _buildJsonExport(List<DataRecord> records) {
+    final docs = records.map((r) => {
+          '_id': r.id,
+          ...r.data,
+          '_createdAt': r.createdAt.toIso8601String(),
+          '_updatedAt': r.updatedAt.toIso8601String(),
+        }).toList();
+    return const JsonEncoder.withIndent('  ').convert(docs);
+  }
+
+  String _buildCsvExport(List<DataRecord> records) {
+    // Tüm sütunları topla
+    final columns = <String>{};
+    for (final r in records) {
+      columns.addAll(r.data.keys);
+    }
+    final cols = columns.toList();
+
+    final buffer = StringBuffer();
+    // Header satırı
+    buffer.writeln((['_id', ...cols, '_createdAt', '_updatedAt'])
+        .map(_csvEscape)
+        .join(','));
+    // Veri satırları
+    for (final r in records) {
+      final row = [
+        r.id,
+        ...cols.map((c) => _displayValue(r.data[c])),
+        r.createdAt.toIso8601String(),
+        r.updatedAt.toIso8601String(),
+      ].map(_csvEscape).join(',');
+      buffer.writeln(row);
+    }
+    return buffer.toString();
+  }
+
+  String _csvEscape(String value) {
+    if (value.contains(',') ||
+        value.contains('"') ||
+        value.contains('\n')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
   }
 
   Widget _buildAccessDenied() {
@@ -1594,6 +1980,56 @@ class _DataExplorerPageState
         backgroundColor: AppColors.danger,
       ),
     );
+  }
+
+  Future<void> _showAddCollectionDialog() async {
+    final controller = TextEditingController();
+    final dbName = _selectedDatabase!.name;
+    final prefix = '${dbName}_';
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Yeni Collection Ekle'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: 'Collection Adı (Prefix Otomatik)', 
+              hintText: 'örn. test_koleksiyon',
+              prefixText: prefix,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
+              },
+              child: const Text('Ekle'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      final name = '$prefix${controller.text.trim()}';
+      setState(() {
+        _selectedDatabase!.collections.add(name);
+        _selectedCollection = name;
+        _lastSelectedCollection = name;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("'$name' koleksiyonu oluşturuldu."), backgroundColor: Colors.green),
+        );
+      }
+    }
   }
 }
 

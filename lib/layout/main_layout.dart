@@ -1,8 +1,9 @@
 import 'package:dmbs_frontend/features/audit_logs/audit_log_page.dart';
 import 'package:dmbs_frontend/features/dashboard/dashboard_page.dart';
-import 'package:dmbs_frontend/features/data_explorer/data_explorer_page.dart';
-import 'package:dmbs_frontend/features/databases/databases_page.dart';
-import 'package:dmbs_frontend/features/permissions/permissions_page.dart';
+import '../features/databases/databases_page.dart';
+import '../features/data_explorer/data_explorer_page.dart';
+import '../features/data_type_explorer/data_type_explorer_page.dart';
+import '../features/permissions/permissions_page.dart';
 import 'package:dmbs_frontend/features/settings/settings_page.dart';
 import 'package:dmbs_frontend/features/users/users_page.dart';
 import 'package:dmbs_frontend/models/permission.dart';
@@ -158,6 +159,8 @@ class _MainLayoutState extends State<MainLayout> {
         return 'Databases';
       case AppPage.dataExplorer:
         return 'Data Explorer';
+      case AppPage.dataTypeExplorer:
+        return 'Data Type Explorer';
       case AppPage.users:
         return 'Users';
       case AppPage.permissions:
@@ -261,6 +264,8 @@ class _MainLayoutState extends State<MainLayout> {
         return DatabasesPage(currentUser: _currentUser);
       case AppPage.dataExplorer:
         return DataExplorerPage(currentUser: _currentUser);
+      case AppPage.dataTypeExplorer:
+        return DataTypeExplorerPage(currentUser: _currentUser);
       case AppPage.users:
         return const UsersPage();
       case AppPage.permissions:

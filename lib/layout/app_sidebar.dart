@@ -35,6 +35,11 @@ class AppSidebar extends StatelessWidget {
       page: AppPage.dataExplorer,
     ),
     NavigationItem(
+      title: 'Data Type Explorer',
+      icon: Icons.schema_outlined,
+      page: AppPage.dataTypeExplorer,
+    ),
+    NavigationItem(
       title: 'Users',
       icon: Icons.people_outline,
       page: AppPage.users,
@@ -71,6 +76,11 @@ class AppSidebar extends StatelessWidget {
       title: 'Data Explorer',
       icon: Icons.table_chart_outlined,
       page: AppPage.dataExplorer,
+    ),
+    NavigationItem(
+      title: 'Data Type Explorer',
+      icon: Icons.schema_outlined,
+      page: AppPage.dataTypeExplorer,
     ),
     NavigationItem(
       title: 'Settings',

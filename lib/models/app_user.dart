@@ -31,7 +31,19 @@ class AppUser {
   final String email;
   final UserRole role;
   final Set<String> departments;
+  final Map<String, List<String>> allowedCollections;
+
+  /// Global (eski) izinler — geriye dönük uyumluluk için tutulur.
   final Set<Permission> permissions;
+
+  /// Departman (database) başına database yetkileri.
+  /// { 'Sensor': {Permission.databaseView, Permission.databaseCreate}, ... }
+  final Map<String, Set<Permission>> databasePermissions;
+
+  /// Koleksiyon başına veri yetkileri.
+  /// { 'sensor_readings': {Permission.dataView, Permission.dataCreate}, ... }
+  final Map<String, Set<Permission>> collectionPermissions;
+
   final bool isActive;
   final bool isDeleted;
   final bool mustChangePassword;
@@ -47,7 +59,10 @@ class AppUser {
     required this.email,
     required this.role,
     required this.departments,
+    this.allowedCollections = const {},
     required this.permissions,
+    this.databasePermissions = const {},
+    this.collectionPermissions = const {},
     required this.isActive,
     this.isDeleted = false,
     this.mustChangePassword = false,
@@ -67,9 +82,30 @@ class AppUser {
     return permissions.contains(permission);
   }
 
+  /// Belirli bir departmanın (database) belirli yetkisini kontrol eder.
+  bool hasDatabasePermission(String department, Permission permission) {
+    if (isSuperAdmin) return true;
+    return databasePermissions[department]?.contains(permission) ?? false;
+  }
+
+  /// Belirli bir koleksiyonun belirli yetkisini kontrol eder.
+  bool hasCollectionPermission(String collection, Permission permission) {
+    if (isSuperAdmin) return true;
+    return collectionPermissions[collection]?.contains(permission) ?? false;
+  }
+
   bool canAccessDepartment(String department) {
     if (isSuperAdmin) return true;
     return departments.contains(department);
+  }
+
+  bool canAccessCollection(String department, String collection) {
+    if (isSuperAdmin) return true;
+    if (!departments.contains(department)) return false;
+
+    final allowed = allowedCollections[department];
+    if (allowed == null) return false;
+    return allowed.contains(collection);
   }
 
   /// "Ahmet Yılmaz" → "AY"
@@ -103,16 +139,55 @@ class AppUser {
     final rawDepartments =
         (json['departments'] as List<dynamic>? ?? []).cast<String>();
 
+    final rawAllowed = json['allowedCollections'] as Map<String, dynamic>? ?? {};
+    final parsedAllowed = <String, List<String>>{};
+    rawAllowed.forEach((key, value) {
+      if (value is List) {
+        parsedAllowed[key] = value.cast<String>();
+      }
+    });
+
+    // Departman bazında database yetkileri
+    final rawDbPerms =
+        json['databasePermissions'] as Map<String, dynamic>? ?? {};
+    final parsedDbPerms = <String, Set<Permission>>{};
+    rawDbPerms.forEach((dept, codes) {
+      if (codes is List) {
+        parsedDbPerms[dept] = codes
+            .cast<String>()
+            .map((code) => PermissionExtension.fromCode(code))
+            .whereType<Permission>()
+            .toSet();
+      }
+    });
+
+    // Koleksiyon bazında veri yetkileri
+    final rawColPerms =
+        json['collectionPermissions'] as Map<String, dynamic>? ?? {};
+    final parsedColPerms = <String, Set<Permission>>{};
+    rawColPerms.forEach((col, codes) {
+      if (codes is List) {
+        parsedColPerms[col] = codes
+            .cast<String>()
+            .map((code) => PermissionExtension.fromCode(code))
+            .whereType<Permission>()
+            .toSet();
+      }
+    });
+
     return AppUser(
       id: (json['_id'] ?? json['id'] ?? '') as String,
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: UserRoleExtension.fromCode(json['role'] as String? ?? ''),
       departments: rawDepartments.toSet(),
+      allowedCollections: parsedAllowed,
       permissions: rawPermissions
           .map((code) => PermissionExtension.fromCode(code))
           .whereType<Permission>()
           .toSet(),
+      databasePermissions: parsedDbPerms,
+      collectionPermissions: parsedColPerms,
       isActive: json['isActive'] as bool? ?? true,
       isDeleted: json['isDeleted'] as bool? ?? false,
       mustChangePassword: json['mustChangePassword'] as bool? ?? false,
@@ -139,7 +214,14 @@ class AppUser {
       'email': email,
       'role': role.code,
       'departments': departments.toList(),
+      'allowedCollections': allowedCollections,
       'permissions': permissions.map((p) => p.code).toList(),
+      'databasePermissions': databasePermissions.map(
+        (dept, perms) => MapEntry(dept, perms.map((p) => p.code).toList()),
+      ),
+      'collectionPermissions': collectionPermissions.map(
+        (col, perms) => MapEntry(col, perms.map((p) => p.code).toList()),
+      ),
       'isActive': isActive,
       'isDeleted': isDeleted,
       'mustChangePassword': mustChangePassword,
@@ -160,7 +242,10 @@ class AppUser {
     String? email,
     UserRole? role,
     Set<String>? departments,
+    Map<String, List<String>>? allowedCollections,
     Set<Permission>? permissions,
+    Map<String, Set<Permission>>? databasePermissions,
+    Map<String, Set<Permission>>? collectionPermissions,
     bool? isActive,
     bool? isDeleted,
     bool? mustChangePassword,
@@ -178,7 +263,11 @@ class AppUser {
       email: email ?? this.email,
       role: role ?? this.role,
       departments: departments ?? this.departments,
+      allowedCollections: allowedCollections ?? this.allowedCollections,
       permissions: permissions ?? this.permissions,
+      databasePermissions: databasePermissions ?? this.databasePermissions,
+      collectionPermissions:
+          collectionPermissions ?? this.collectionPermissions,
       isActive: isActive ?? this.isActive,
       isDeleted: isDeleted ?? this.isDeleted,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
