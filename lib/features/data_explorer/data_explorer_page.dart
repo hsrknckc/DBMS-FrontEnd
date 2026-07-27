@@ -43,154 +43,22 @@ class _DataExplorerPageState
   bool _showJsonView = false;
   bool _isImporting = false;
 
-  final List<_ExplorerDatabase> _databases = [
-    _ExplorerDatabase(
-      id: 'db-1',
-      name: 'sensor_database',
-      department: 'Sensor',
-      collections: [
-        'sensor_readings',
-        'sensor_status',
-        'device_logs',
-      ],
-    ),
-    _ExplorerDatabase(
-      id: 'db-2',
-      name: 'signal_database',
-      department: 'Signal',
-      collections: [
-        'signal_records',
-        'signal_analysis',
-      ],
-    ),
-    _ExplorerDatabase(
-      id: 'db-3',
-      name: 'acoustic_database',
-      department: 'Acoustic',
-      collections: [
-        'acoustic_samples',
-        'analysis_results',
-      ],
-    ),
-    _ExplorerDatabase(
-      id: 'db-4',
-      name: 'sonar_archive',
-      department: 'Sonar',
-      collections: [
-        'sonar_contacts',
-        'archived_scans',
-      ],
-    ),
-  ];
-
-  final List<DataRecord> _records = [
-    DataRecord(
-      id: 'record-1',
-      databaseId: 'db-1',
-      collectionName: 'sensor_readings',
-      data: {
-        'sensorId': 'SEN-001',
-        'type': 'Temperature',
-        'value': 22.8,
-        'unit': '°C',
-        'status': 'Normal',
-        'timestamp': '2026-07-16 08:30',
-      },
-      createdAt: DateTime(2026, 7, 16, 8, 30),
-      updatedAt: DateTime(2026, 7, 16, 8, 30),
-    ),
-    DataRecord(
-      id: 'record-2',
-      databaseId: 'db-1',
-      collectionName: 'sensor_readings',
-      data: {
-        'sensorId': 'SEN-002',
-        'type': 'Pressure',
-        'value': 101.7,
-        'unit': 'kPa',
-        'status': 'Normal',
-        'timestamp': '2026-07-16 08:32',
-      },
-      createdAt: DateTime(2026, 7, 16, 8, 32),
-      updatedAt: DateTime(2026, 7, 16, 8, 32),
-    ),
-    DataRecord(
-      id: 'record-3',
-      databaseId: 'db-1',
-      collectionName: 'sensor_readings',
-      data: {
-        'sensorId': 'SEN-003',
-        'type': 'Humidity',
-        'value': 67,
-        'unit': '%',
-        'status': 'Warning',
-        'timestamp': '2026-07-16 08:35',
-      },
-      createdAt: DateTime(2026, 7, 16, 8, 35),
-      updatedAt: DateTime(2026, 7, 16, 8, 35),
-    ),
-    DataRecord(
-      id: 'record-4',
-      databaseId: 'db-1',
-      collectionName: 'sensor_status',
-      data: {
-        'sensorId': 'SEN-001',
-        'online': true,
-        'battery': 84,
-        'location': 'Test Area A',
-        'lastConnection': '2026-07-16 08:40',
-      },
-      createdAt: DateTime(2026, 7, 16, 8, 40),
-      updatedAt: DateTime(2026, 7, 16, 8, 40),
-    ),
-    DataRecord(
-      id: 'record-5',
-      databaseId: 'db-2',
-      collectionName: 'signal_records',
-      data: {
-        'signalId': 'SIG-101',
-        'frequency': 1250,
-        'amplitude': 0.82,
-        'classification': 'Unknown',
-        'timestamp': '2026-07-16 07:55',
-      },
-      createdAt: DateTime(2026, 7, 16, 7, 55),
-      updatedAt: DateTime(2026, 7, 16, 7, 55),
-    ),
-    DataRecord(
-      id: 'record-6',
-      databaseId: 'db-3',
-      collectionName: 'acoustic_samples',
-      data: {
-        'sampleId': 'AC-550',
-        'frequency': 620,
-        'duration': 4.5,
-        'confidence': 0.91,
-        'classification': 'Marine Object',
-      },
-      createdAt: DateTime(2026, 7, 15, 18, 20),
-      updatedAt: DateTime(2026, 7, 15, 18, 20),
-    ),
-  ];
-
   List<_ExplorerDatabase> get _visibleDatabases {
     final dbAsync = ref.watch(databasesProvider);
     final serverDbs = dbAsync.valueOrNull ?? [];
 
-    final List<_ExplorerDatabase> sourceList = serverDbs.isNotEmpty
-        ? serverDbs.map((db) => _ExplorerDatabase(
-              id: db.id,
-              name: db.name,
-              department: db.department,
-              collections: const [
-                'sensor_readings',
-                'sensor_status',
-                'device_logs',
-                'signal_records',
-                'acoustic_samples',
-              ],
-            )).toList()
-        : _databases;
+    final List<_ExplorerDatabase> sourceList = serverDbs.map((db) => _ExplorerDatabase(
+          id: db.id,
+          name: db.name,
+          department: db.department,
+          collections: const [
+            'sensor_readings',
+            'sensor_status',
+            'device_logs',
+            'signal_records',
+            'acoustic_samples',
+          ],
+        )).toList();
 
     if (widget.currentUser.isSuperAdmin) {
       return sourceList;
@@ -241,24 +109,12 @@ class _DataExplorerPageState
     }
 
     final recordsAsync = ref.watch(dataExplorerProvider);
-    final serverRecords = recordsAsync.valueOrNull ?? [];
-
-    final List<DataRecord> sourceRecords =
-        (serverRecords.isNotEmpty || recordsAsync.isLoading)
-            ? serverRecords
-            : _records;
+    final sourceRecords = recordsAsync.valueOrNull ?? [];
 
     final query =
         _searchController.text.trim().toLowerCase();
 
     return sourceRecords.where((record) {
-      if (sourceRecords == _records) {
-        final belongsToSelection =
-            record.databaseId == databaseId &&
-            record.collectionName == collectionName;
-        if (!belongsToSelection) return false;
-      }
-
       if (query.isEmpty) {
         return true;
       }
@@ -1321,9 +1177,9 @@ class _DataExplorerPageState
     );
   }
 
-  void _importDocuments(
+  Future<void> _importDocuments(
     List<Map<String, dynamic>> documents,
-  ) {
+  ) async {
     final databaseId = _selectedDatabaseId;
     final collectionName = _selectedCollection;
 
@@ -1363,9 +1219,23 @@ class _DataExplorerPageState
       );
     }
 
-    setState(() {
-      _records.addAll(importedRecords);
-    });
+    if (importedRecords.isNotEmpty) {
+      final dataList = importedRecords.map((r) => r.data).toList();
+      try {
+        await ref.read(dataExplorerProvider.notifier).importRecords(dataList);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${importedRecords.length} kayıt içe aktarıldı.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('İçe aktarma hatası: $e')),
+          );
+        }
+      }
+    }
   }
 
   String? _extractMongoDocumentId(dynamic idValue) {
@@ -1394,7 +1264,7 @@ class _DataExplorerPageState
 
   Future<void> _showCreateRecordDialog() async {
     final existingKeys = <String>{};
-    for (var r in _records.where((r) => r.databaseId == _selectedDatabaseId && r.collectionName == _selectedCollection)) {
+    for (var r in _filteredRecords) {
       existingKeys.addAll(r.data.keys);
     }
     
@@ -1416,32 +1286,20 @@ class _DataExplorerPageState
       return;
     }
 
-    final now = DateTime.now();
-
-    setState(() {
-      _records.add(
-        DataRecord(
-          id: 'record-${now.millisecondsSinceEpoch}',
-          databaseId: _selectedDatabaseId!,
-          collectionName: _selectedCollection!,
-          data: result,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-    });
-
-    if (!mounted) {
-      return;
+    try {
+      await ref.read(dataExplorerProvider.notifier).createRecord(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Yeni kayıt oluşturuldu.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Yeni kayıt oluşturuldu.',
-        ),
-      ),
-    );
   }
 
   Future<void> _showEditRecordDialog(
@@ -1457,20 +1315,24 @@ class _DataExplorerPageState
       return;
     }
 
-    final index = _records.indexWhere(
-      (item) => item.id == record.id,
-    );
-
-    if (index == -1) {
-      return;
-    }
-
-    setState(() {
-      _records[index] = record.copyWith(
+    try {
+      final updatedRecord = record.copyWith(
         data: result,
         updatedAt: DateTime.now(),
       );
-    });
+      await ref.read(dataExplorerProvider.notifier).updateRecord(updatedRecord);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kayıt güncellendi.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
   }
 
   Future<Map<String, dynamic>?> _showRecordEditorDialog({
@@ -1783,11 +1645,20 @@ class _DataExplorerPageState
       return;
     }
 
-    setState(() {
-      _records.removeWhere(
-        (item) => item.id == record.id,
-      );
-    });
+    try {
+      await ref.read(dataExplorerProvider.notifier).deleteRecord(record.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kayıt silindi.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _showRecordDetails(
