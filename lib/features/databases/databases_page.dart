@@ -29,20 +29,29 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
   /// 1: Silinen database'ler
   int _viewFilter = 0;
 
+  static const List<String> _defaultDepartments = [
+    'Sensor',
+    'Signal',
+    'Acoustic',
+    'Sonar',
+    'General',
+    'Test',
+  ];
+
   List<DatabaseItem> get _databases {
     final dbState = ref.watch(databasesProvider);
     return dbState.valueOrNull ?? [];
   }
 
   List<String> get _departments {
-    final departments = _databases
+    final serverDepts = _databases
         .map((database) => database.department)
-        .toSet()
-        .toList();
+        .where((dept) => dept.trim().isNotEmpty);
 
-    departments.sort();
+    final allDepts = {..._defaultDepartments, ...serverDepts}.toList();
+    allDepts.sort();
 
-    return departments;
+    return allDepts;
   }
 
   bool get _canCreateDatabase {
