@@ -20,8 +20,8 @@ class TcpConfig {
   final Duration requestTimeout;
 
   const TcpConfig({
-    this.host = '192.168.1.100',
-    this.port = 8080,
+    this.host = '54.154.220.190',
+    this.port = 5150,
     this.connectTimeout = const Duration(seconds: 10),
     this.requestTimeout = const Duration(seconds: 30),
   });
