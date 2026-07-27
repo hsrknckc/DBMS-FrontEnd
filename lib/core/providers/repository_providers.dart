@@ -57,8 +57,8 @@ final tcpSocketServiceProvider = socketServiceProvider;
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║        ⚡ TEK GEÇİŞ NOKTASI — MOCK / TCP / HTTP                            ║
 // ║                                                                              ║
-// ║  Şu an: MOCK  (geliştirme için, sahte veri)                                 ║
-// ║  TCP'ye geç : Yorum satırlarını değiştir → TcpXxxRepository(...)           ║
+// ║  Şu an: TCP  (Canlı AWS Sunucusu: 54.154.220.190:5150)                       ║
+// ║  MOCK'a geç: Yorum satırlarını değiştir → MockXxxRepository(...)          ║
 // ║  HTTP'ye geç: Yorum satırlarını değiştir → HttpXxxRepository(...)          ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 // ═══════════════════════════════════════════════════════════════════════════════
