@@ -46,7 +46,11 @@ class HttpDataExplorerRepository implements DataExplorerRepository {
   }
 
   @override
-  Future<void> deleteRecord(String id) async {
+  Future<void> deleteRecord(
+    String id, {
+    String? databaseId,
+    String? collectionName,
+  }) async {
     // TODO: DELETE /records/:id
     throw UnimplementedError('HttpDataExplorerRepository.deleteRecord');
   }

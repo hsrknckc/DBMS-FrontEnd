@@ -24,7 +24,11 @@ abstract class DataExplorerRepository {
   Future<DataRecord> updateRecord(DataRecord record);
 
   /// Kaydı siler (data explorer'da soft-delete yok, kalıcı).
-  Future<void> deleteRecord(String id);
+  Future<void> deleteRecord(
+    String id, {
+    String? databaseId,
+    String? collectionName,
+  });
 
   /// Kayıtları export eder.
   /// [format]: 'json' | 'csv'

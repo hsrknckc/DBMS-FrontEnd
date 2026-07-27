@@ -152,7 +152,11 @@ class MockDataExplorerRepository implements DataExplorerRepository {
   }
 
   @override
-  Future<void> deleteRecord(String id) async {
+  Future<void> deleteRecord(
+    String id, {
+    String? databaseId,
+    String? collectionName,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     _records.removeWhere((r) => r.id == id);
   }

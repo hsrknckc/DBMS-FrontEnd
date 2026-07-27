@@ -71,17 +71,30 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   Future<DataRecord> updateRecord(DataRecord record) async {
     final response = await _tcp.send(
       action: 'records.update',
-      payload: record.toJson(),
+      payload: {
+        'id': record.id,
+        'databaseId': record.databaseId,
+        'collectionName': record.collectionName,
+        'data': record.data,
+      },
       token: _tokenProvider(),
     );
     return DataRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
   @override
-  Future<void> deleteRecord(String id) async {
+  Future<void> deleteRecord(
+    String id, {
+    String? databaseId,
+    String? collectionName,
+  }) async {
     await _tcp.send(
       action: 'records.delete',
-      payload: {'id': id},
+      payload: {
+        'id': id,
+        if (databaseId != null) 'databaseId': databaseId,
+        if (collectionName != null) 'collectionName': collectionName,
+      },
       token: _tokenProvider(),
     );
   }
