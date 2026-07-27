@@ -19,6 +19,8 @@ class TcpAuthRepository implements AuthRepository {
   /// Oturum tokeni — login sonrası saklanır, diğer isteklerde kullanılır.
   String? _token;
 
+  String? get token => _token;
+
   TcpAuthRepository(this._tcp);
 
   @override
