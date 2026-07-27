@@ -4,16 +4,19 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/data_record.dart';
 import '../../models/permission.dart';
+import '../databases/controllers/databases_notifier.dart';
+import './controllers/data_explorer_notifier.dart';
 
 enum RecordFieldType { string, number, boolean, nullValue }
 
-class DataExplorerPage extends StatefulWidget {
+class DataExplorerPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
 
   const DataExplorerPage({
@@ -22,12 +25,12 @@ class DataExplorerPage extends StatefulWidget {
   });
 
   @override
-  State<DataExplorerPage> createState() =>
+  ConsumerState<DataExplorerPage> createState() =>
       _DataExplorerPageState();
 }
 
 class _DataExplorerPageState
-    extends State<DataExplorerPage> {
+    extends ConsumerState<DataExplorerPage> {
   static String? _lastSelectedDatabaseId;
   static String? _lastSelectedCollection;
 
@@ -171,11 +174,29 @@ class _DataExplorerPageState
   ];
 
   List<_ExplorerDatabase> get _visibleDatabases {
+    final dbAsync = ref.watch(databasesProvider);
+    final serverDbs = dbAsync.valueOrNull ?? [];
+
+    final List<_ExplorerDatabase> sourceList = serverDbs.isNotEmpty
+        ? serverDbs.map((db) => _ExplorerDatabase(
+              id: db.id,
+              name: db.name,
+              department: db.department,
+              collections: const [
+                'sensor_readings',
+                'sensor_status',
+                'device_logs',
+                'signal_records',
+                'acoustic_samples',
+              ],
+            )).toList()
+        : _databases;
+
     if (widget.currentUser.isSuperAdmin) {
-      return _databases;
+      return sourceList;
     }
 
-    return _databases.map((database) {
+    return sourceList.map((database) {
       if (!widget.currentUser.canAccessDepartment(database.department)) {
         return null;
       }
@@ -219,16 +240,23 @@ class _DataExplorerPageState
       return [];
     }
 
+    final recordsAsync = ref.watch(dataExplorerProvider);
+    final serverRecords = recordsAsync.valueOrNull ?? [];
+
+    final List<DataRecord> sourceRecords =
+        (serverRecords.isNotEmpty || recordsAsync.isLoading)
+            ? serverRecords
+            : _records;
+
     final query =
         _searchController.text.trim().toLowerCase();
 
-    return _records.where((record) {
-      final belongsToSelection =
-          record.databaseId == databaseId &&
-          record.collectionName == collectionName;
-
-      if (!belongsToSelection) {
-        return false;
+    return sourceRecords.where((record) {
+      if (sourceRecords == _records) {
+        final belongsToSelection =
+            record.databaseId == databaseId &&
+            record.collectionName == collectionName;
+        if (!belongsToSelection) return false;
       }
 
       if (query.isEmpty) {
