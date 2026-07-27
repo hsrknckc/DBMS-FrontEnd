@@ -9,8 +9,10 @@ part of 'db_request.dart';
 DbRequest _$DbRequestFromJson(Map<String, dynamic> json) => DbRequest(
       requestId: json['requestId'] as String,
       action: json['action'] as String,
-      username: json['username'] as String,
-      password: json['password'] as String,
+      token: json['token'] as String?,
+      payload: json['payload'] as Map<String, dynamic>?,
+      username: json['username'] as String?,
+      password: json['password'] as String?,
       database: json['database'] as String?,
       collection: json['collection'] as String?,
       filter: json['filter'] as Map<String, dynamic>?,
@@ -21,8 +23,6 @@ Map<String, dynamic> _$DbRequestToJson(DbRequest instance) {
   final val = <String, dynamic>{
     'requestId': instance.requestId,
     'action': instance.action,
-    'username': instance.username,
-    'password': instance.password,
   };
 
   void writeNotNull(String key, dynamic value) {
@@ -31,6 +31,10 @@ Map<String, dynamic> _$DbRequestToJson(DbRequest instance) {
     }
   }
 
+  writeNotNull('token', instance.token);
+  writeNotNull('payload', instance.payload);
+  writeNotNull('username', instance.username);
+  writeNotNull('password', instance.password);
   writeNotNull('database', instance.database);
   writeNotNull('collection', instance.collection);
   writeNotNull('filter', instance.filter);
