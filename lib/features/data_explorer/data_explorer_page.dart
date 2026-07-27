@@ -386,21 +386,13 @@ class _DataExplorerPageState
         // SuperAdmin her zaman tam yetkili.
         // Normal kullanıcı için _canImport / _canCreate yoksa butonlar
         // görünür ama disabled + %50 opaklık + Tooltip ile uyarı verir.
-<<<<<<< HEAD
         const noWriteTooltip =
-=======
-        const _noWriteTooltip =
->>>>>>> origin/main
             'Bu işlem için yazma yetkiniz bulunmamaktadır.\nYöneticinizle iletişime geçin.';
 
         Widget importBtn = Opacity(
           opacity: _canImport ? 1.0 : 0.5,
           child: Tooltip(
-<<<<<<< HEAD
             message: _canImport ? '' : noWriteTooltip,
-=======
-            message: _canImport ? '' : _noWriteTooltip,
->>>>>>> origin/main
             child: OutlinedButton.icon(
               onPressed: _canImport && _hasSelection && !_isImporting
                   ? _pickAndImportJson
@@ -420,11 +412,7 @@ class _DataExplorerPageState
         Widget createBtn = Opacity(
           opacity: _canCreate ? 1.0 : 0.5,
           child: Tooltip(
-<<<<<<< HEAD
             message: _canCreate ? '' : noWriteTooltip,
-=======
-            message: _canCreate ? '' : _noWriteTooltip,
->>>>>>> origin/main
             child: ElevatedButton.icon(
               onPressed: _canCreate && _hasSelection
                   ? _showCreateRecordDialog
@@ -688,20 +676,12 @@ class _DataExplorerPageState
                     ),
                   ),
                 ],
-<<<<<<< HEAD
                 child: IgnorePointer(
                   child: OutlinedButton.icon(
                     onPressed: recordCount == 0 ? null : () {},
                     icon: const Icon(Icons.download_outlined),
                     label: const Text('Dışa Aktar'),
                   ),
-=======
-                child: OutlinedButton.icon(
-                  // onPressed null yaparak tıklamayı PopupMenuButton'a bırakıyoruz
-                  onPressed: recordCount == 0 ? null : () {},
-                  icon: const Icon(Icons.download_outlined),
-                  label: const Text('Dışa Aktar'),
->>>>>>> origin/main
                 ),
               ),
             ],
@@ -1852,34 +1832,14 @@ class _DataExplorerPageState
     final ext = format.toLowerCase(); // 'json' veya 'csv'
     final defaultFileName = '${collectionName}.$ext';
 
-<<<<<<< HEAD
-=======
-    // Downloads klasörünü bul (path_provider)
->>>>>>> origin/main
     String? initialDir;
     try {
       final downloads = await getDownloadsDirectory();
       initialDir = downloads?.path;
-<<<<<<< HEAD
-    } catch (_) {}
-
-    // İsim veya tip değiştirmeyi yasaklamak için sadece "Klasör Seçimi" yapıyoruz
-    final selectedDirectory = await FilePicker.getDirectoryPath(
-      dialogTitle: '$format dosyasının kaydedileceği klasörü seçin',
-      initialDirectory: initialDir,
-    );
-
-    if (selectedDirectory == null) return; // Kullanıcı iptal etti
-    if (!mounted) return;
-
-    final savePath = '$selectedDirectory${Platform.pathSeparator}$defaultFileName';
-
-=======
     } catch (_) {
       // Desteklenmeyen platformda görmezden gel
     }
 
-    // Masaüstü kaydetme penceresi — file_picker ^11 static API
     final savePath = await FilePicker.saveFile(
       dialogTitle: '$format formatında dışa aktar',
       fileName: defaultFileName,
@@ -1891,7 +1851,6 @@ class _DataExplorerPageState
     if (savePath == null) return; // kullanıcı iptal etti
     if (!mounted) return;
 
->>>>>>> origin/main
     try {
       final content = format == 'JSON'
           ? _buildJsonExport(records)
@@ -1903,11 +1862,6 @@ class _DataExplorerPageState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-<<<<<<< HEAD
-            '${records.length} kayıt $format olarak kaydedildi:\n$savePath',
-          ),
-          duration: const Duration(seconds: 6),
-=======
             '${records.length} kayıt $format olarak kaydedildi: $savePath',
           ),
           duration: const Duration(seconds: 4),
@@ -1915,7 +1869,6 @@ class _DataExplorerPageState
             label: 'Tamam',
             onPressed: () {},
           ),
->>>>>>> origin/main
         ),
       );
     } catch (e) {
