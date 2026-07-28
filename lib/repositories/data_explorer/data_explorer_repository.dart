@@ -2,6 +2,9 @@ import '../../models/data_record.dart';
 
 /// Data Explorer CRUD + export işlemleri için soyut arayüz.
 abstract class DataExplorerRepository {
+  /// Koleksiyon listesini getirir.
+  Future<List<String>> getCollections(String databaseName);
+
   /// Belirli bir database ve collection'daki kayıtları getirir.
   /// [searchQuery] varsa sonuçları filtreler.
   Future<List<DataRecord>> getRecords({
@@ -23,7 +26,7 @@ abstract class DataExplorerRepository {
   /// Mevcut kaydı günceller.
   Future<DataRecord> updateRecord(DataRecord record);
 
-  /// Kaydı siler (data explorer'da soft-delete yok, kalıcı).
+  /// Kaydı siler.
   Future<void> deleteRecord(
     String id, {
     String? databaseId,
@@ -31,8 +34,6 @@ abstract class DataExplorerRepository {
   });
 
   /// Kayıtları export eder.
-  /// [format]: 'json' | 'csv'
-  /// Dönen String → indirme URL'i veya dosya içeriği.
   Future<String> exportRecords({
     required String databaseId,
     required String collectionName,

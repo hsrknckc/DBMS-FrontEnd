@@ -6,20 +6,45 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
   bool _includeDeleted = false;
 
   @override
-  Future<List<DatabaseItem>> build() {
-    return ref
+  Future<List<DatabaseItem>> build() async {
+    return _fetchEnrichedDatabases();
+  }
+
+  Future<List<DatabaseItem>> _fetchEnrichedDatabases() async {
+    final list = await ref
         .read(databaseRepositoryProvider)
         .getDatabases(includeDeleted: _includeDeleted);
+
+    final explorerRepo = ref.read(dataExplorerRepositoryProvider);
+    final enrichedList = <DatabaseItem>[];
+
+    for (final db in list) {
+      try {
+        final cols = await explorerRepo.getCollections(db.name);
+        int totalRecs = 0;
+        for (final col in cols) {
+          final recs = await explorerRepo.getRecords(
+            databaseId: db.name,
+            collectionName: col,
+          );
+          totalRecs += recs.length;
+        }
+        enrichedList.add(db.copyWith(
+          collectionCount: cols.length,
+          recordCount: totalRecs,
+        ));
+      } catch (_) {
+        enrichedList.add(db);
+      }
+    }
+
+    return enrichedList;
   }
 
   Future<void> refresh({bool? includeDeleted}) async {
     if (includeDeleted != null) _includeDeleted = includeDeleted;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => ref
-          .read(databaseRepositoryProvider)
-          .getDatabases(includeDeleted: _includeDeleted),
-    );
+    state = await AsyncValue.guard(() => _fetchEnrichedDatabases());
   }
 
   Future<void> createDatabase({
@@ -33,6 +58,7 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
           description: description,
         );
     state = AsyncData([...state.value ?? [], newDb]);
+    await refresh(includeDeleted: _includeDeleted);
   }
 
   Future<void> updateDatabase(DatabaseItem item) async {
@@ -41,6 +67,7 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
     state = AsyncData(
       (state.value ?? []).map((db) => db.id == updated.id ? updated : db).toList(),
     );
+    await refresh(includeDeleted: _includeDeleted);
   }
 
   Future<void> softDelete(String id) async {

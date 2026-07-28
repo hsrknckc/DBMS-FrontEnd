@@ -1,7 +1,7 @@
 import '../../models/data_record.dart';
 import 'data_explorer_repository.dart';
 
-/// Sahte data explorer verisi — data_explorer_page.dart'taki hard-coded veriler buraya taşındı.
+/// Sahte data explorer verisi.
 class MockDataExplorerRepository implements DataExplorerRepository {
   final List<DataRecord> _records = [
     DataRecord(
@@ -49,48 +49,17 @@ class MockDataExplorerRepository implements DataExplorerRepository {
       createdAt: DateTime(2026, 7, 16, 8, 35),
       updatedAt: DateTime(2026, 7, 16, 8, 35),
     ),
-    DataRecord(
-      id: 'record-4',
-      databaseId: 'db-1',
-      collectionName: 'device_logs',
-      data: const {
-        'deviceId': 'DEV-010',
-        'event': 'reconnected',
-        'location': 'Test Area A',
-        'lastConnection': '2026-07-16 08:40',
-      },
-      createdAt: DateTime(2026, 7, 16, 8, 40),
-      updatedAt: DateTime(2026, 7, 16, 8, 40),
-    ),
-    DataRecord(
-      id: 'record-5',
-      databaseId: 'db-2',
-      collectionName: 'signal_records',
-      data: const {
-        'signalId': 'SIG-101',
-        'frequency': 1250,
-        'amplitude': 0.82,
-        'classification': 'Unknown',
-        'timestamp': '2026-07-16 07:55',
-      },
-      createdAt: DateTime(2026, 7, 16, 7, 55),
-      updatedAt: DateTime(2026, 7, 16, 7, 55),
-    ),
-    DataRecord(
-      id: 'record-6',
-      databaseId: 'db-3',
-      collectionName: 'acoustic_samples',
-      data: const {
-        'sampleId': 'AC-550',
-        'frequency': 620,
-        'duration': 4.5,
-        'confidence': 0.91,
-        'classification': 'Marine Object',
-      },
-      createdAt: DateTime(2026, 7, 15, 18, 20),
-      updatedAt: DateTime(2026, 7, 15, 18, 20),
-    ),
   ];
+
+  @override
+  Future<List<String>> getCollections(String databaseName) async {
+    final cols = _records
+        .where((r) => r.databaseId == databaseName)
+        .map((r) => r.collectionName)
+        .toSet()
+        .toList();
+    return cols;
+  }
 
   @override
   Future<List<DataRecord>> getRecords({
@@ -168,7 +137,6 @@ class MockDataExplorerRepository implements DataExplorerRepository {
     required String format,
   }) async {
     await Future.delayed(const Duration(milliseconds: 600));
-    // Mock: boş export URL döner
     return 'mock-export-$databaseId-$collectionName.$format';
   }
 
