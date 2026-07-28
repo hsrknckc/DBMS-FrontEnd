@@ -3,7 +3,7 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/database_item.dart';
 import 'database_repository.dart';
 
-/// TCP/IP soket üzerinden database CRUD işlemleri (Sadece Canlı Sunucu).
+/// TCP/IP soket üzerinden database CRUD işlemleri (Canlı Sunucu).
 class TcpDatabaseRepository implements DatabaseRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
@@ -44,7 +44,7 @@ class TcpDatabaseRepository implements DatabaseRepository {
     }
 
     final rawData = response['data'];
-    if (rawData is List && rawData.isNotEmpty) {
+    if (rawData is List) {
       final fetched = rawData.map((item) {
         if (item is String) {
           return DatabaseItem(
@@ -74,11 +74,8 @@ class TcpDatabaseRepository implements DatabaseRepository {
         );
       }).toList();
 
-      for (final db in fetched) {
-        if (!_localDbs.any((e) => e.id == db.id || e.name == db.name)) {
-          _localDbs.add(db);
-        }
-      }
+      _localDbs.clear();
+      _localDbs.addAll(fetched);
     }
 
     if (includeDeleted) {
@@ -183,17 +180,11 @@ class TcpDatabaseRepository implements DatabaseRepository {
   @override
   Future<void> softDeleteDatabase(String id) async {
     final c = _getCreds();
-    final index = _localDbs.indexWhere((db) => db.id == id || db.name == id);
-    if (index != -1) {
-      _localDbs[index] = _localDbs[index].copyWith(
-        isDeleted: true,
-        deletedAt: DateTime.now(),
-      );
-    }
+    _localDbs.removeWhere((db) => db.id == id || db.name == id);
 
     try {
       await _tcp.send(
-        action: 'DELETE_DATABASE',
+        action: 'DROP_DATABASE',
         username: c?.username,
         password: c?.password,
         database: id,
@@ -201,10 +192,19 @@ class TcpDatabaseRepository implements DatabaseRepository {
     } catch (_) {
       try {
         await _tcp.send(
-          action: 'databases.softDelete',
-          payload: {'id': id},
+          action: 'DELETE_DATABASE',
+          username: c?.username,
+          password: c?.password,
+          database: id,
         );
-      } catch (_) {}
+      } catch (_) {
+        try {
+          await _tcp.send(
+            action: 'databases.softDelete',
+            payload: {'id': id},
+          );
+        } catch (_) {}
+      }
     }
   }
 
@@ -251,10 +251,19 @@ class TcpDatabaseRepository implements DatabaseRepository {
     } catch (_) {
       try {
         await _tcp.send(
-          action: 'databases.permanentDelete',
-          payload: {'id': id},
+          action: 'DELETE_DATABASE',
+          username: c?.username,
+          password: c?.password,
+          database: id,
         );
-      } catch (_) {}
+      } catch (_) {
+        try {
+          await _tcp.send(
+            action: 'databases.permanentDelete',
+            payload: {'id': id},
+          );
+        } catch (_) {}
+      }
     }
   }
 
