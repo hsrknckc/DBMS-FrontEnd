@@ -45,19 +45,53 @@ class _DataExplorerPageState
   bool _isImporting = false;
 
   final Map<String, Set<String>> _extraCollections = {};
+  final Map<String, List<String>> _serverCollections = {};
+  bool _collectionsLoading = false;
+
+  /// Sunucudan LIST_COLLECTIONS ile koleksiyonları çeker ve cache'ler.
+  Future<void> _loadCollectionsForDatabase(String dbId, String dbName) async {
+    if (_collectionsLoading) return;
+    _collectionsLoading = true;
+
+    try {
+      final tcp = ref.read(socketServiceProvider);
+      final response = await tcp.send(
+        action: 'LIST_COLLECTIONS',
+        payload: {
+          'database': dbName,
+          'databaseId': dbId,
+        },
+      );
+      final rawData = response['data'];
+      if (rawData is List) {
+        final cols = rawData.map((e) => e.toString()).toList();
+        if (mounted) {
+          setState(() {
+            _serverCollections[dbId] = cols;
+          });
+        }
+      }
+    } catch (e) {
+      print('[DataExplorer] LIST_COLLECTIONS hatası: $e');
+    } finally {
+      _collectionsLoading = false;
+    }
+  }
 
   List<_ExplorerDatabase> get _visibleDatabases {
     final dbAsync = ref.watch(databasesProvider);
     final serverDbs = dbAsync.valueOrNull ?? [];
 
     final List<_ExplorerDatabase> sourceList = serverDbs.map((db) {
-      final cols = (_extraCollections[db.id] ?? <String>{}).toList();
+      final serverCols = _serverCollections[db.id] ?? [];
+      final extraCols = _extraCollections[db.id] ?? <String>{};
+      final mergedCols = {...serverCols, ...extraCols}.toList();
 
       return _ExplorerDatabase(
         id: db.id,
         name: db.name,
         department: db.department,
-        collections: cols,
+        collections: mergedCols,
       );
     }).toList();
 
@@ -202,6 +236,11 @@ class _DataExplorerPageState
       (db) => db.id == _selectedDatabaseId,
       orElse: () => databases.first,
     );
+
+    // Sunucudan koleksiyonlar henüz çekilmemişse, çek
+    if (!_serverCollections.containsKey(selectedDb.id)) {
+      _loadCollectionsForDatabase(selectedDb.id, selectedDb.name);
+    }
 
     if (_selectedCollection == null ||
         !selectedDb.collections.contains(_selectedCollection)) {
@@ -430,6 +469,9 @@ class _DataExplorerPageState
                         _selectedDatabaseId;
                     ref.read(selectedCollectionProvider.notifier).state =
                         _selectedCollection;
+
+                    // Yeni veritabanı seçildiğinde koleksiyonlarını sunucudan çek
+                    _loadCollectionsForDatabase(database.id, database.name);
                   },
                 ),
               ),
