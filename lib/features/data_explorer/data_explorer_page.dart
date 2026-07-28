@@ -2083,8 +2083,15 @@ class _DataExplorerPageState
         final creds = ref.read(credentialsProvider);
         if (creds != null) {
           final tcpRepo = ref.read(socketServiceProvider);
-          tcpRepo.send(
+          await tcpRepo.send(
             action: 'DROP_COLLECTION',
+            username: creds.username,
+            password: creds.password,
+            database: currentDb.name,
+            collection: currentCol,
+          ).catchError((_) => <String, dynamic>{});
+          await tcpRepo.send(
+            action: 'DELETE_COLLECTION',
             username: creds.username,
             password: creds.password,
             database: currentDb.name,

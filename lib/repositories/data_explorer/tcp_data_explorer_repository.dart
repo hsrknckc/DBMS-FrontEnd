@@ -3,7 +3,7 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/data_record.dart';
 import 'data_explorer_repository.dart';
 
-/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Sadece Canlı Sunucu).
+/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Canlı Sunucu).
 class TcpDataExplorerRepository implements DataExplorerRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
@@ -44,17 +44,40 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         database: databaseName,
       );
       final rawData = response['data'];
-      if (rawData is List && rawData.isNotEmpty) {
+      if (rawData is List) {
         final fetched = rawData.map((e) => e.toString()).toList();
-        final current = _localCollections[databaseName] ?? [];
-        for (final item in fetched) {
-          if (!current.contains(item)) current.add(item);
-        }
-        _localCollections[databaseName] = current;
+        _localCollections[databaseName] = fetched;
       }
     } catch (_) {}
 
     return _localCollections[databaseName] ?? [];
+  }
+
+  /// Koleksiyonu Silme (DROP_COLLECTION)
+  Future<void> dropCollection(String databaseName, String collectionName) async {
+    _localCollections[databaseName]?.remove(collectionName);
+    _localRecords.remove('${databaseName}_$collectionName');
+
+    final c = _getCreds();
+    try {
+      await _tcp.send(
+        action: 'DROP_COLLECTION',
+        username: c?.username,
+        password: c?.password,
+        database: databaseName,
+        collection: collectionName,
+      );
+    } catch (_) {
+      try {
+        await _tcp.send(
+          action: 'DELETE_COLLECTION',
+          username: c?.username,
+          password: c?.password,
+          database: databaseName,
+          collection: collectionName,
+        );
+      } catch (_) {}
+    }
   }
 
   @override
@@ -92,7 +115,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     }
 
     final rawData = response['data'];
-    if (rawData is List && rawData.isNotEmpty) {
+    if (rawData is List) {
       final fetched = rawData.map((doc) {
         if (doc is Map<String, dynamic>) {
           return DataRecord.fromJson(doc);
@@ -109,13 +132,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         );
       }).toList();
 
-      final current = _localRecords[key] ?? [];
-      for (final rec in fetched) {
-        if (!current.any((r) => r.id == rec.id)) {
-          current.add(rec);
-        }
-      }
-      _localRecords[key] = current;
+      _localRecords[key] = fetched;
     }
 
     final list = _localRecords[key] ?? [];
@@ -272,22 +289,34 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         database: databaseId,
         collection: collectionName,
         filter: {'id': id, '_id': id},
+        document: {'id': id, '_id': id},
       );
     } catch (_) {
       try {
         await _tcp.send(
-          action: 'records.delete',
-          payload: {
-            'id': id,
-            '_id': id,
-            if (databaseId != null) 'database': databaseId,
-            if (databaseId != null) 'databaseId': databaseId,
-            if (collectionName != null) 'collection': collectionName,
-            if (collectionName != null) 'collectionName': collectionName,
-            'filter': {'id': id, '_id': id},
-          },
+          action: 'DELETE_RECORD',
+          username: c?.username,
+          password: c?.password,
+          database: databaseId,
+          collection: collectionName,
+          filter: {'id': id, '_id': id},
         );
-      } catch (_) {}
+      } catch (_) {
+        try {
+          await _tcp.send(
+            action: 'records.delete',
+            payload: {
+              'id': id,
+              '_id': id,
+              if (databaseId != null) 'database': databaseId,
+              if (databaseId != null) 'databaseId': databaseId,
+              if (collectionName != null) 'collection': collectionName,
+              if (collectionName != null) 'collectionName': collectionName,
+              'filter': {'id': id, '_id': id},
+            },
+          );
+        } catch (_) {}
+      }
     }
   }
 
