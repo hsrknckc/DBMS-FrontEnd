@@ -2005,6 +2005,9 @@ class _DataExplorerPageState
 
         try {
           final creds = ref.read(credentialsProvider);
+          final explorerRepo = ref.read(dataExplorerRepositoryProvider);
+
+          // 1. CREATE_COLLECTION isteği
           if (creds != null) {
             final tcpRepo = ref.read(socketServiceProvider);
             tcpRepo.send(
@@ -2015,6 +2018,18 @@ class _DataExplorerPageState
               collection: name,
             ).catchError((_) => <String, dynamic>{});
           }
+
+          // 2. Veritabanında koleksiyonu kalıcı hale getirmek için başlangıç kaydı ekle
+          explorerRepo.createRecord(
+            databaseId: currentDb.name,
+            collectionName: name,
+            data: {
+              'info': '$name koleksiyonu oluşturuldu',
+              'created_at': DateTime.now().toIso8601String(),
+            },
+          ).then((_) {
+            ref.invalidate(dataExplorerProvider);
+          }).catchError((_) {});
         } catch (_) {}
 
         if (mounted) {

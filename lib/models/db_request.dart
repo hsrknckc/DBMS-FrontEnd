@@ -3,14 +3,12 @@ import 'package:json_annotation/json_annotation.dart';
 part 'db_request.g.dart';
 
 /// Backend TCP/IP soket sunucusuna gönderilen istek veri modeli (DTO).
-///
-/// Yeni Protokol Zarfı:
-///   `{"requestId": "...", "action": "...", "username": "...", "password": "...",
-///     "database": "...", "collection": "...", "filter": {...}, "document": {...}}`
 @JsonSerializable(includeIfNull: false)
 class DbRequest {
   final String requestId;
   final String action;
+  final String? token;
+  final Map<String, dynamic>? payload;
   final String? username;
   final String? password;
   final String? database;
@@ -21,6 +19,8 @@ class DbRequest {
   const DbRequest({
     required this.requestId,
     required this.action,
+    this.token,
+    this.payload,
     this.username,
     this.password,
     this.database,

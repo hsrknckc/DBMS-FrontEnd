@@ -8,6 +8,8 @@ part of 'db_response.dart';
 
 DbResponse _$DbResponseFromJson(Map<String, dynamic> json) => DbResponse(
       requestId: json['requestId'] as String? ?? '',
+      ok: json['ok'] as bool?,
+      error: json['error'] as String?,
       status: json['status'] as String?,
       message: json['message'] as String?,
       data: json['data'],
@@ -24,6 +26,8 @@ Map<String, dynamic> _$DbResponseToJson(DbResponse instance) {
     }
   }
 
+  writeNotNull('ok', instance.ok);
+  writeNotNull('error', instance.error);
   writeNotNull('status', instance.status);
   writeNotNull('message', instance.message);
   writeNotNull('data', instance.data);
