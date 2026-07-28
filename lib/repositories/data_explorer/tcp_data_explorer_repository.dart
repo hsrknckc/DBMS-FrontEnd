@@ -18,6 +18,39 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
 
   TcpDataExplorerRepository(this._tcp, this._tokenProvider);
 
+  /// MongoDB erişilebilirlik kontrolü (PING)
+  Future<bool> ping() async {
+    try {
+      final response = await _tcp.send(
+        action: 'PING',
+        payload: {},
+        token: _tokenProvider(),
+      );
+      return response['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Veritabanındaki koleksiyon adlarını çekme (LIST_COLLECTIONS)
+  Future<List<String>> getCollections(String databaseName) async {
+    try {
+      final response = await _tcp.send(
+        action: 'LIST_COLLECTIONS',
+        payload: {
+          'database': databaseName,
+          'databaseId': databaseName,
+        },
+        token: _tokenProvider(),
+      );
+      final rawData = response['data'];
+      if (rawData is List) {
+        return rawData.map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   @override
   Future<List<DataRecord>> getRecords({
     required String databaseId,

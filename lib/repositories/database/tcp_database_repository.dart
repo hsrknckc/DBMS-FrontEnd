@@ -20,13 +20,54 @@ class TcpDatabaseRepository implements DatabaseRepository {
 
   @override
   Future<List<DatabaseItem>> getDatabases({bool includeDeleted = false}) async {
-    final response = await _tcp.send(
-      action: 'databases.list',
-      payload: {'includeDeleted': includeDeleted},
-      token: _tokenProvider(),
-    );
-    final list = (response['data'] as List<dynamic>).cast<Map<String, dynamic>>();
-    return list.map(_parseDb).toList();
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'LIST_DATABASES',
+        payload: {},
+        token: _tokenProvider(),
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'databases.list',
+        payload: {'includeDeleted': includeDeleted},
+        token: _tokenProvider(),
+      );
+    }
+
+    final rawData = response['data'];
+    if (rawData == null || rawData is! List) {
+      return [];
+    }
+
+    return rawData.map((item) {
+      if (item is String) {
+        return DatabaseItem(
+          id: item,
+          name: item,
+          department: 'General',
+          description: '$item veritabanı',
+          collectionCount: 0,
+          recordCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      } else if (item is Map<String, dynamic>) {
+        return _parseDb(item);
+      } else if (item is Map) {
+        return _parseDb(Map<String, dynamic>.from(item));
+      }
+      return DatabaseItem(
+        id: item.toString(),
+        name: item.toString(),
+        department: 'General',
+        description: '',
+        collectionCount: 0,
+        recordCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }).toList();
   }
 
   @override
