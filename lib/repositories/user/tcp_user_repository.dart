@@ -4,43 +4,12 @@ import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'user_repository.dart';
 
-/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri (Yedekli ve Kesintisiz).
+/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri (Sadece Canlı Sunucu).
 class TcpUserRepository implements UserRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
 
-  final List<AppUser> _localUsers = [
-    AppUser(
-      id: 'usr_1',
-      name: 'Ahmet Yılmaz',
-      email: 'ahmet.yilmaz@company.com',
-      role: UserRole.superAdmin,
-      departments: {'R&D', 'IT', 'Telecommunication'},
-      permissions: Permission.values.toSet(),
-      isActive: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 90)),
-    ),
-    AppUser(
-      id: 'usr_2',
-      name: 'Ayşe Demir',
-      email: 'ayse.demir@company.com',
-      role: UserRole.user,
-      departments: {'R&D'},
-      permissions: {Permission.databaseView, Permission.dataView, Permission.dataCreate, Permission.dataUpdate},
-      isActive: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 45)),
-    ),
-    AppUser(
-      id: 'usr_3',
-      name: 'Mehmet Kaya',
-      email: 'mehmet.kaya@company.com',
-      role: UserRole.user,
-      departments: {'IT'},
-      permissions: {Permission.databaseView, Permission.dataView},
-      isActive: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 20)),
-    ),
-  ];
+  final List<AppUser> _localUsers = [];
 
   TcpUserRepository(this._tcp, this._credentialsProvider);
 

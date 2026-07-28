@@ -3,7 +3,7 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/data_record.dart';
 import 'data_explorer_repository.dart';
 
-/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Yedekli ve Kesintisiz).
+/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Sadece Canlı Sunucu).
 class TcpDataExplorerRepository implements DataExplorerRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
@@ -11,45 +11,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   final Map<String, List<DataRecord>> _localRecords = {};
   final Map<String, List<String>> _localCollections = {};
 
-  TcpDataExplorerRepository(this._tcp, this._credentialsProvider) {
-    _initDefaults();
-  }
-
-  void _initDefaults() {
-    _localCollections['sensor_data'] = ['readings', 'alerts', 'logs'];
-    _localCollections['signal_logs'] = ['telemetry', 'events'];
-    _localCollections['user_management'] = ['users', 'roles', 'permissions'];
-
-    _localRecords['sensor_data_readings'] = [
-      DataRecord(
-        id: 'rec_101',
-        databaseId: 'sensor_data',
-        collectionName: 'readings',
-        data: {'sensorId': 'SNS-01', 'temperature': 24.5, 'status': 'ACTIVE', 'location': 'Lab-A'},
-        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-        updatedAt: DateTime.now(),
-      ),
-      DataRecord(
-        id: 'rec_102',
-        databaseId: 'sensor_data',
-        collectionName: 'readings',
-        data: {'sensorId': 'SNS-02', 'temperature': 31.2, 'status': 'WARNING', 'location': 'Server Room'},
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        updatedAt: DateTime.now(),
-      ),
-    ];
-
-    _localRecords['signal_logs_telemetry'] = [
-      DataRecord(
-        id: 'rec_201',
-        databaseId: 'signal_logs',
-        collectionName: 'telemetry',
-        data: {'frequency': '5.8 GHz', 'signalStrength': -65, 'quality': 'HIGH'},
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        updatedAt: DateTime.now(),
-      ),
-    ];
-  }
+  TcpDataExplorerRepository(this._tcp, this._credentialsProvider);
 
   Credentials? _getCreds() {
     return _credentialsProvider();
@@ -71,6 +33,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   }
 
   /// Veritabanındaki koleksiyon adlarını çekme (LIST_COLLECTIONS)
+  @override
   Future<List<String>> getCollections(String databaseName) async {
     try {
       final c = _getCreds();
@@ -91,7 +54,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
       }
     } catch (_) {}
 
-    return _localCollections[databaseName] ?? ['default_collection'];
+    return _localCollections[databaseName] ?? [];
   }
 
   @override

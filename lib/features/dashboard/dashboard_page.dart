@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
+import '../databases/controllers/databases_notifier.dart';
+import '../users/controllers/users_notifier.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends ConsumerWidget {
   final AppUser? currentUser;
 
   const DashboardPage({
@@ -11,7 +14,7 @@ class DashboardPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -28,7 +31,7 @@ class DashboardPage extends StatelessWidget {
         children: [
           _buildWelcomeSection(context, titleColor, subtitleColor),
           const SizedBox(height: 24),
-          _buildStatCards(boxBgColor, borderColor, titleColor, subtitleColor),
+          _buildStatCards(ref, boxBgColor, borderColor, titleColor, subtitleColor),
           const SizedBox(height: 24),
           _buildBottomSection(context, boxBgColor, borderColor, titleColor, subtitleColor, isDark),
         ],
@@ -68,26 +71,43 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCards(Color boxBgColor, Color borderColor, Color titleColor, Color subtitleColor) {
-    const stats = [
+  Widget _buildStatCards(WidgetRef ref, Color boxBgColor, Color borderColor, Color titleColor, Color subtitleColor) {
+    final dbsAsync = ref.watch(databasesProvider);
+    final usersAsync = ref.watch(usersProvider);
+
+    final dbs = dbsAsync.valueOrNull ?? [];
+    final users = usersAsync.valueOrNull ?? [];
+
+    final totalDbs = dbs.length;
+    int totalCols = 0;
+    int totalRecs = 0;
+
+    for (final db in dbs) {
+      totalCols += db.collectionCount;
+      totalRecs += db.recordCount;
+    }
+
+    final activeUsers = users.where((u) => u.isActive).length;
+
+    final stats = [
       _StatItem(
         title: 'Toplam Database',
-        value: '8',
+        value: totalDbs.toString(),
         icon: Icons.storage_outlined,
       ),
       _StatItem(
         title: 'Toplam Collection',
-        value: '24',
+        value: totalCols.toString(),
         icon: Icons.folder_copy_outlined,
       ),
       _StatItem(
         title: 'Toplam Kayıt',
-        value: '128.450',
+        value: totalRecs.toString(),
         icon: Icons.table_rows_outlined,
       ),
       _StatItem(
         title: 'Aktif Kullanıcı',
-        value: '16',
+        value: activeUsers.toString(),
         icon: Icons.people_outline,
       ),
     ];
@@ -138,12 +158,13 @@ class DashboardPage extends StatelessWidget {
                 subtitleColor: subtitleColor,
                 isDark: isDark,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _SystemStatusCard(
                 boxBgColor: boxBgColor,
                 borderColor: borderColor,
                 titleColor: titleColor,
                 subtitleColor: subtitleColor,
+                isDark: isDark,
               ),
             ],
           );
@@ -153,7 +174,7 @@ class DashboardPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              flex: 2,
+              flex: 3,
               child: _RecentActivityCard(
                 boxBgColor: boxBgColor,
                 borderColor: borderColor,
@@ -162,13 +183,15 @@ class DashboardPage extends StatelessWidget {
                 isDark: isDark,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 24),
             Expanded(
+              flex: 2,
               child: _SystemStatusCard(
                 boxBgColor: boxBgColor,
                 borderColor: borderColor,
                 titleColor: titleColor,
                 subtitleColor: subtitleColor,
+                isDark: isDark,
               ),
             ),
           ],
@@ -211,21 +234,21 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: boxBgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF4F46E5).withAlpha(25),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.storage_outlined,
-              color: Color(0xFF4F46E5),
+            child: Icon(
+              item.icon,
+              color: AppColors.primary,
+              size: 24,
             ),
           ),
           const SizedBox(width: 16),
@@ -234,19 +257,19 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.value,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: titleColor,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
                   item.title,
                   style: TextStyle(
                     fontSize: 13,
                     color: subtitleColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: titleColor,
                   ),
                 ),
               ],
@@ -275,126 +298,38 @@ class _RecentActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const activities = [
-      _ActivityItem(
-        title: 'Yeni collection oluşturuldu',
-        description: 'sensor_data collection oluşturuldu.',
-        time: '5 dakika önce',
-        icon: Icons.folder_copy_outlined,
-      ),
-      _ActivityItem(
-        title: 'Kullanıcı yetkisi güncellendi',
-        description: 'Mehmet Kaya, Sensor Admin olarak atandı.',
-        time: '22 dakika önce',
-        icon: Icons.admin_panel_settings_outlined,
-      ),
-      _ActivityItem(
-        title: 'Veri dışa aktarıldı',
-        description: 'signal_data verileri CSV olarak indirildi.',
-        time: '1 saat önce',
-        icon: Icons.download_outlined,
-      ),
-    ];
-
-    final iconBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
-
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: boxBgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Son İşlemler',
+            'Son Hareketler',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: titleColor,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Sistemde gerçekleştirilen son hareketler.',
-            style: TextStyle(fontSize: 13, color: subtitleColor),
-          ),
-          const SizedBox(height: 20),
-          ...activities.map((activity) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: iconBgColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      activity.icon,
-                      size: 20,
-                      color: subtitleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activity.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: titleColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          activity.description,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: subtitleColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    activity.time,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: subtitleColor,
-                    ),
-                  ),
-                ],
+          const SizedBox(height: 16),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Text(
+                'Henüz hareket kaydı yok',
+                style: TextStyle(color: AppColors.textSecondary),
               ),
-            );
-          }),
+            ),
+          ),
         ],
       ),
     );
   }
-}
-
-class _ActivityItem {
-  final String title;
-  final String description;
-  final String time;
-  final IconData icon;
-
-  const _ActivityItem({
-    required this.title,
-    required this.description,
-    required this.time,
-    required this.icon,
-  });
 }
 
 class _SystemStatusCard extends StatelessWidget {
@@ -402,21 +337,23 @@ class _SystemStatusCard extends StatelessWidget {
   final Color borderColor;
   final Color titleColor;
   final Color subtitleColor;
+  final bool isDark;
 
   const _SystemStatusCard({
     required this.boxBgColor,
     required this.borderColor,
     required this.titleColor,
     required this.subtitleColor,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: boxBgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -430,100 +367,36 @@ class _SystemStatusCard extends StatelessWidget {
               color: titleColor,
             ),
           ),
-          const SizedBox(height: 20),
-          _StatusRow(
-            title: 'MongoDB',
-            status: 'Bağlı',
-            isActive: true,
-            titleColor: titleColor,
-            subtitleColor: subtitleColor,
-          ),
           const SizedBox(height: 16),
-          _StatusRow(
-            title: 'Spring Boot API',
-            status: 'Çevrimdışı',
-            isActive: false,
-            titleColor: titleColor,
-            subtitleColor: subtitleColor,
-          ),
-          const SizedBox(height: 16),
-          _StatusRow(
-            title: 'Son yedekleme',
-            status: 'Bugün 09:30',
-            isActive: true,
-            titleColor: titleColor,
-            subtitleColor: subtitleColor,
-          ),
-          const SizedBox(height: 20),
-          Divider(color: borderColor, height: 1),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(
-                Icons.schedule_outlined,
-                size: 18,
-                color: subtitleColor,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Son güncelleme: 10 Temmuz 2026, 14:20',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: subtitleColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          _buildStatusRow('TCP Soket Bağlantısı', true, 'Aktif (54.154.220.190:5150)'),
+          const SizedBox(height: 12),
+          _buildStatusRow('MongoDB Servisi', true, 'Bağlı'),
         ],
       ),
     );
   }
-}
 
-class _StatusRow extends StatelessWidget {
-  final String title;
-  final String status;
-  final bool isActive;
-  final Color titleColor;
-  final Color subtitleColor;
-
-  const _StatusRow({
-    required this.title,
-    required this.status,
-    required this.isActive,
-    required this.titleColor,
-    required this.subtitleColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStatusRow(String label, bool isOk, String statusText) {
     return Row(
       children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isActive ? AppColors.success : AppColors.danger,
-          ),
+        Icon(
+          isOk ? Icons.check_circle_outline : Icons.error_outline,
+          color: isOk ? AppColors.success : AppColors.danger,
+          size: 20,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: titleColor,
-            ),
+            label,
+            style: TextStyle(fontSize: 14, color: titleColor),
           ),
         ),
         Text(
-          status,
+          statusText,
           style: TextStyle(
             fontSize: 13,
-            color: subtitleColor,
+            fontWeight: FontWeight.w600,
+            color: isOk ? AppColors.success : AppColors.danger,
           ),
         ),
       ],

@@ -3,43 +3,12 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/database_item.dart';
 import 'database_repository.dart';
 
-/// TCP/IP soket üzerinden database CRUD işlemleri (Yedekli ve Kesintisiz).
+/// TCP/IP soket üzerinden database CRUD işlemleri (Sadece Canlı Sunucu).
 class TcpDatabaseRepository implements DatabaseRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
 
-  final List<DatabaseItem> _localDbs = [
-    DatabaseItem(
-      id: 'sensor_data',
-      name: 'sensor_data',
-      department: 'R&D',
-      description: 'Sensör verileri veritabanı',
-      collectionCount: 3,
-      recordCount: 150,
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      updatedAt: DateTime.now(),
-    ),
-    DatabaseItem(
-      id: 'signal_logs',
-      name: 'signal_logs',
-      department: 'Telecommunication',
-      description: 'Sinyal logları veritabanı',
-      collectionCount: 2,
-      recordCount: 840,
-      createdAt: DateTime.now().subtract(const Duration(days: 15)),
-      updatedAt: DateTime.now(),
-    ),
-    DatabaseItem(
-      id: 'user_management',
-      name: 'user_management',
-      department: 'IT',
-      description: 'Kullanıcı yönetimi veritabanı',
-      collectionCount: 4,
-      recordCount: 25,
-      createdAt: DateTime.now().subtract(const Duration(days: 60)),
-      updatedAt: DateTime.now(),
-    ),
-  ];
+  final List<DatabaseItem> _localDbs = [];
 
   TcpDatabaseRepository(this._tcp, this._credentialsProvider);
 
