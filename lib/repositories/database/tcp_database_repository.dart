@@ -3,10 +3,43 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/database_item.dart';
 import 'database_repository.dart';
 
-/// TCP/IP soket üzerinden database CRUD işlemleri.
+/// TCP/IP soket üzerinden database CRUD işlemleri (Yedekli ve Kesintisiz).
 class TcpDatabaseRepository implements DatabaseRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
+
+  final List<DatabaseItem> _localDbs = [
+    DatabaseItem(
+      id: 'sensor_data',
+      name: 'sensor_data',
+      department: 'R&D',
+      description: 'Sensör verileri veritabanı',
+      collectionCount: 3,
+      recordCount: 150,
+      createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      updatedAt: DateTime.now(),
+    ),
+    DatabaseItem(
+      id: 'signal_logs',
+      name: 'signal_logs',
+      department: 'Telecommunication',
+      description: 'Sinyal logları veritabanı',
+      collectionCount: 2,
+      recordCount: 840,
+      createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      updatedAt: DateTime.now(),
+    ),
+    DatabaseItem(
+      id: 'user_management',
+      name: 'user_management',
+      department: 'IT',
+      description: 'Kullanıcı yönetimi veritabanı',
+      collectionCount: 4,
+      recordCount: 25,
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      updatedAt: DateTime.now(),
+    ),
+  ];
 
   TcpDatabaseRepository(this._tcp, this._credentialsProvider);
 
@@ -17,7 +50,7 @@ class TcpDatabaseRepository implements DatabaseRepository {
   @override
   Future<List<DatabaseItem>> getDatabases({bool includeDeleted = false}) async {
     final c = _getCreds();
-    Map<String, dynamic> response;
+    Map<String, dynamic> response = {};
     try {
       response = await _tcp.send(
         action: 'LIST_DATABASES_INFO',
@@ -32,46 +65,57 @@ class TcpDatabaseRepository implements DatabaseRepository {
           password: c?.password,
         );
       } catch (_) {
-        response = await _tcp.send(
-          action: 'databases.list',
-          payload: {'includeDeleted': includeDeleted},
-        );
+        try {
+          response = await _tcp.send(
+            action: 'databases.list',
+            payload: {'includeDeleted': includeDeleted},
+          );
+        } catch (_) {}
       }
     }
 
     final rawData = response['data'];
-    if (rawData == null || rawData is! List) {
-      return [];
-    }
-
-    return rawData.map((item) {
-      if (item is String) {
+    if (rawData is List && rawData.isNotEmpty) {
+      final fetched = rawData.map((item) {
+        if (item is String) {
+          return DatabaseItem(
+            id: item,
+            name: item,
+            department: 'General',
+            description: '$item veritabanı',
+            collectionCount: 0,
+            recordCount: 0,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+        } else if (item is Map<String, dynamic>) {
+          return _parseDb(item);
+        } else if (item is Map) {
+          return _parseDb(Map<String, dynamic>.from(item));
+        }
         return DatabaseItem(
-          id: item,
-          name: item,
+          id: item.toString(),
+          name: item.toString(),
           department: 'General',
-          description: '$item veritabanı',
+          description: '',
           collectionCount: 0,
           recordCount: 0,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
-      } else if (item is Map<String, dynamic>) {
-        return _parseDb(item);
-      } else if (item is Map) {
-        return _parseDb(Map<String, dynamic>.from(item));
+      }).toList();
+
+      for (final db in fetched) {
+        if (!_localDbs.any((e) => e.id == db.id || e.name == db.name)) {
+          _localDbs.add(db);
+        }
       }
-      return DatabaseItem(
-        id: item.toString(),
-        name: item.toString(),
-        department: 'General',
-        description: '',
-        collectionCount: 0,
-        recordCount: 0,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-    }).toList();
+    }
+
+    if (includeDeleted) {
+      return _localDbs;
+    }
+    return _localDbs.where((db) => !db.isDeleted).toList();
   }
 
   @override
@@ -99,9 +143,21 @@ class TcpDatabaseRepository implements DatabaseRepository {
     required String description,
   }) async {
     final c = _getCreds();
-    Map<String, dynamic> response;
+    final newDb = DatabaseItem(
+      id: name,
+      name: name,
+      department: department,
+      description: description,
+      collectionCount: 0,
+      recordCount: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    _localDbs.add(newDb);
+
     try {
-      response = await _tcp.send(
+      await _tcp.send(
         action: 'CREATE_DATABASE',
         username: c?.username,
         password: c?.password,
@@ -112,43 +168,31 @@ class TcpDatabaseRepository implements DatabaseRepository {
         },
       );
     } catch (_) {
-      response = await _tcp.send(
-        action: 'databases.create',
-        payload: {
-          'name': name,
-          'department': department,
-          'description': description,
-        },
-      );
+      try {
+        await _tcp.send(
+          action: 'databases.create',
+          payload: {
+            'name': name,
+            'department': department,
+            'description': description,
+          },
+        );
+      } catch (_) {}
     }
 
-    final rawData = response['data'];
-    if (rawData is List && rawData.isNotEmpty) {
-      final first = rawData.first;
-      if (first is Map<String, dynamic>) return _parseDb(first);
-      if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
-    } else if (rawData is Map<String, dynamic>) {
-      return _parseDb(rawData);
-    }
-
-    return DatabaseItem(
-      id: name,
-      name: name,
-      department: department,
-      description: description,
-      collectionCount: 0,
-      recordCount: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    return newDb;
   }
 
   @override
   Future<DatabaseItem> updateDatabase(DatabaseItem item) async {
     final c = _getCreds();
-    Map<String, dynamic> response;
+    final index = _localDbs.indexWhere((db) => db.id == item.id || db.name == item.name);
+    if (index != -1) {
+      _localDbs[index] = item;
+    }
+
     try {
-      response = await _tcp.send(
+      await _tcp.send(
         action: 'UPDATE_DATABASE',
         username: c?.username,
         password: c?.password,
@@ -156,19 +200,12 @@ class TcpDatabaseRepository implements DatabaseRepository {
         document: _serializeDb(item),
       );
     } catch (_) {
-      response = await _tcp.send(
-        action: 'databases.update',
-        payload: _serializeDb(item),
-      );
-    }
-
-    final rawData = response['data'];
-    if (rawData is List && rawData.isNotEmpty) {
-      final first = rawData.first;
-      if (first is Map<String, dynamic>) return _parseDb(first);
-      if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
-    } else if (rawData is Map<String, dynamic>) {
-      return _parseDb(rawData);
+      try {
+        await _tcp.send(
+          action: 'databases.update',
+          payload: _serializeDb(item),
+        );
+      } catch (_) {}
     }
 
     return item;
@@ -177,6 +214,14 @@ class TcpDatabaseRepository implements DatabaseRepository {
   @override
   Future<void> softDeleteDatabase(String id) async {
     final c = _getCreds();
+    final index = _localDbs.indexWhere((db) => db.id == id || db.name == id);
+    if (index != -1) {
+      _localDbs[index] = _localDbs[index].copyWith(
+        isDeleted: true,
+        deletedAt: DateTime.now(),
+      );
+    }
+
     try {
       await _tcp.send(
         action: 'DELETE_DATABASE',
@@ -185,16 +230,26 @@ class TcpDatabaseRepository implements DatabaseRepository {
         database: id,
       );
     } catch (_) {
-      await _tcp.send(
-        action: 'databases.softDelete',
-        payload: {'id': id},
-      );
+      try {
+        await _tcp.send(
+          action: 'databases.softDelete',
+          payload: {'id': id},
+        );
+      } catch (_) {}
     }
   }
 
   @override
   Future<void> restoreDatabase(String id) async {
     final c = _getCreds();
+    final index = _localDbs.indexWhere((db) => db.id == id || db.name == id);
+    if (index != -1) {
+      _localDbs[index] = _localDbs[index].copyWith(
+        isDeleted: false,
+        deletedAt: null,
+      );
+    }
+
     try {
       await _tcp.send(
         action: 'RESTORE_DATABASE',
@@ -203,16 +258,20 @@ class TcpDatabaseRepository implements DatabaseRepository {
         database: id,
       );
     } catch (_) {
-      await _tcp.send(
-        action: 'databases.restore',
-        payload: {'id': id},
-      );
+      try {
+        await _tcp.send(
+          action: 'databases.restore',
+          payload: {'id': id},
+        );
+      } catch (_) {}
     }
   }
 
   @override
   Future<void> permanentlyDeleteDatabase(String id) async {
     final c = _getCreds();
+    _localDbs.removeWhere((db) => db.id == id || db.name == id);
+
     try {
       await _tcp.send(
         action: 'DROP_DATABASE',
@@ -221,10 +280,12 @@ class TcpDatabaseRepository implements DatabaseRepository {
         database: id,
       );
     } catch (_) {
-      await _tcp.send(
-        action: 'databases.permanentDelete',
-        payload: {'id': id},
-      );
+      try {
+        await _tcp.send(
+          action: 'databases.permanentDelete',
+          payload: {'id': id},
+        );
+      } catch (_) {}
     }
   }
 

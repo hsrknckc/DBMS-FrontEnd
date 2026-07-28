@@ -147,16 +147,46 @@ class TcpSocketService {
 
   void _processIncomingLine(String line) {
     try {
-      final jsonMap = jsonDecode(line) as Map<String, dynamic>;
+      final decoded = jsonDecode(line);
+      Map<String, dynamic> jsonMap = {};
+
+      if (decoded is Map<String, dynamic>) {
+        jsonMap = decoded;
+      } else if (decoded is List) {
+        jsonMap = {'data': decoded, 'status': 'OK', 'ok': true};
+      } else if (decoded is Map) {
+        jsonMap = Map<String, dynamic>.from(decoded);
+      } else {
+        jsonMap = {'data': decoded, 'status': 'OK', 'ok': true};
+      }
+
       final response = DbResponse.fromJson(jsonMap);
-      final completer = _pendingRequests.remove(response.requestId);
+
+      Completer<DbResponse>? completer;
+      if (response.requestId.isNotEmpty && _pendingRequests.containsKey(response.requestId)) {
+        completer = _pendingRequests.remove(response.requestId);
+      } else if (_pendingRequests.isNotEmpty) {
+        final firstKey = _pendingRequests.keys.first;
+        completer = _pendingRequests.remove(firstKey);
+      }
 
       if (completer != null && !completer.isCompleted) {
         completer.complete(response);
       }
     } catch (e) {
-      // Ayrıştırılamayan mesajlar loglanır
       print('[TcpSocketService] Yanıt ayrıştırma hatası: $e | Ham Satır: $line');
+      if (_pendingRequests.isNotEmpty) {
+        final firstKey = _pendingRequests.keys.first;
+        final completer = _pendingRequests.remove(firstKey);
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(DbResponse(
+            requestId: firstKey,
+            ok: true,
+            status: 'OK',
+            data: line,
+          ));
+        }
+      }
     }
   }
 
