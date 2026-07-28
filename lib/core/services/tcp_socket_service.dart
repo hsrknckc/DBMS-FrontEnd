@@ -26,8 +26,8 @@ class TcpConfig {
   const TcpConfig({
     this.host = '54.154.220.190',
     this.port = 5150,
-    this.connectTimeout = const Duration(seconds: 10),
-    this.requestTimeout = const Duration(seconds: 30),
+    this.connectTimeout = const Duration(seconds: 3),
+    this.requestTimeout = const Duration(seconds: 4),
   });
 }
 
@@ -43,7 +43,7 @@ class TcpSocketService {
   bool _disposed = false;
   bool _reconnecting = false;
   int _reconnectAttempt = 0;
-  static const int _maxBackoffSeconds = 30;
+  static const int _maxBackoffSeconds = 15;
 
   /// Bekleyen istekler: requestId ➔ Completer<DbResponse>
   final Map<String, Completer<DbResponse>> _pendingRequests = {};
@@ -236,7 +236,6 @@ class TcpSocketService {
   // ── İstek Gönderme Mimarisi (Completer + Multiplexed) ───────────────────
 
   /// Bir [DbRequest] paketini tek satırlık JSON + '\n' formatında sunucuya gönderir.
-  /// Yanıt [request.requestId] üzerinden asenkron olarak tamamlanır.
   Future<DbResponse> sendRequest(DbRequest request) async {
     if (_currentState != TcpConnectionState.connected) {
       await connect();
@@ -248,51 +247,25 @@ class TcpSocketService {
     _pendingRequests[request.requestId] = completer;
 
     try {
-      // İstek sonuna '\n' eklenerek gönderilir (Framing Rule 1)
       _socket!.write('$jsonPayload\n');
     } catch (e) {
       _pendingRequests.remove(request.requestId);
       rethrow;
     }
 
-    // Zaman aşımı yönetimi
+    // Zaman aşımı süresi 4 saniyeye düşürüldü (Kullanıcı yüklemede takılmasın)
     return completer.future.timeout(
       config.requestTimeout,
       onTimeout: () {
         _pendingRequests.remove(request.requestId);
         throw TcpException(
-          'İstek zaman aşımına uğradı (${config.requestTimeout.inSeconds}s): ${request.action}',
+          'Zaman aşımı (${config.requestTimeout.inSeconds}s): ${request.action}',
         );
       },
     );
   }
 
-  /// Yardımcı metot: Parametrelerle hızlıca [DbRequest] oluşturup gönderir.
-  Future<DbResponse> execute({
-    required String action,
-    String? username,
-    String? password,
-    String? database,
-    String? collection,
-    Map<String, dynamic>? filter,
-    Map<String, dynamic>? document,
-    String? requestId,
-  }) async {
-    final req = DbRequest(
-      requestId: requestId ?? _uuid.v4(),
-      action: action,
-      username: username,
-      password: password,
-      database: database,
-      collection: collection,
-      filter: filter,
-      document: document,
-    );
-
-    return sendRequest(req);
-  }
-
-  /// Esnek İstek Metodu (Canlı AWS TCP + Yeni Java Protokolü Uyumlu)
+  /// Esnek İstek Metodu
   Future<Map<String, dynamic>> send({
     required String action,
     String? username,
@@ -336,10 +309,6 @@ class TcpSocketService {
     };
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Özel Hata Sınıfı
-// ═══════════════════════════════════════════════════════════════════════════
 
 class TcpException implements Exception {
   final String message;
