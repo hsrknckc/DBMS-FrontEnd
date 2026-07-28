@@ -6,7 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'auth_repository.dart';
 
-/// TCP/IP soket üzerinden kimlik doğrulama işlemleri (Sadece Gerçek Sunucu Doğrulaması).
+/// TCP/IP soket üzerinden kimlik doğrulama işlemleri (PROTOKOL.md Tek Protokol).
 class TcpAuthRepository implements AuthRepository {
   final TcpSocketService _tcp;
   final StateController<Credentials?>? _credentialsNotifier;
@@ -20,38 +20,15 @@ class TcpAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser> login(String email, String password) async {
-    Map<String, dynamic> response = {};
-    bool authenticated = false;
+    final response = await _tcp.send(
+      action: 'LOGIN',
+      username: email,
+      password: password,
+    );
 
-    // 1. Yeni Protokol Dene (LOGIN with username & password)
-    try {
-      response = await _tcp.send(
-        action: 'LOGIN',
-        username: email,
-        password: password,
-      ).timeout(const Duration(seconds: 4));
-      if (response['ok'] == true || response['status'] == 'OK') {
-        authenticated = true;
-      }
-    } catch (_) {}
-
-    // 2. Canlı AWS Protokolü Dene (auth.login with payload)
-    if (!authenticated) {
-      try {
-        response = await _tcp.send(
-          action: 'auth.login',
-          payload: {'email': email, 'password': password},
-        ).timeout(const Duration(seconds: 4));
-        if (response['ok'] == true || response['status'] == 'OK') {
-          authenticated = true;
-        }
-      } catch (_) {}
-    }
-
-    // 3. Sunucu doğrulaması yapılmadıysa kesinlikle içeri alma ve Hata Fırlat!
-    if (!authenticated) {
+    if (response['status'] != 'OK') {
       throw const TcpException(
-        'Giriş Başarısız: Sunucuda bu kullanıcı adı ve şifre ile eşleşen bir hesap bulunamadı veya sunucu bağlantısı kurulamadı.',
+        'Giriş Başarısız: Sunucuda bu kullanıcı adı ve şifre ile eşleşen bir hesap bulunamadı.',
       );
     }
 
@@ -92,7 +69,7 @@ class TcpAuthRepository implements AuthRepository {
 
   @override
   Future<void> requestPasswordReset(String email) async {
-    // Sunucu tarafında parola sıfırlama endpoint'i bulunmuyor.
+    // Sunucu tarafında parola sıfırlama işlemi bulunmuyor.
   }
 
   @override
@@ -100,48 +77,40 @@ class TcpAuthRepository implements AuthRepository {
     final creds = _activeCredentials ?? _credentialsNotifier?.state;
     if (creds == null) return null;
 
-    Map<String, dynamic> response = {};
     try {
-      response = await _tcp.send(
+      final response = await _tcp.send(
         action: 'LOGIN',
         username: creds.username,
         password: creds.password,
-      ).timeout(const Duration(seconds: 4));
-    } catch (_) {
-      try {
-        response = await _tcp.send(
-          action: 'auth.login',
-          payload: {'email': creds.username, 'password': creds.password},
-        ).timeout(const Duration(seconds: 4));
-      } catch (_) {
+      );
+
+      if (response['status'] != 'OK') {
         await logout();
         return null;
       }
-    }
 
-    if (response['ok'] != true && response['status'] != 'OK') {
+      final rawData = response['data'];
+      Map<String, dynamic> userMap = {};
+      if (rawData is List && rawData.isNotEmpty) {
+        final first = rawData.first;
+        if (first is Map<String, dynamic>) {
+          userMap = first;
+        } else if (first is Map) {
+          userMap = Map<String, dynamic>.from(first);
+        }
+      } else if (rawData is Map<String, dynamic>) {
+        userMap = rawData;
+      }
+
+      if (!userMap.containsKey('email') || userMap['email'] == null) {
+        userMap['email'] = creds.username;
+      }
+
+      return _parseUser(userMap);
+    } catch (_) {
       await logout();
       return null;
     }
-
-    final rawData = response['data'];
-    Map<String, dynamic> userMap = {};
-    if (rawData is List && rawData.isNotEmpty) {
-      final first = rawData.first;
-      if (first is Map<String, dynamic>) {
-        userMap = first;
-      } else if (first is Map) {
-        userMap = Map<String, dynamic>.from(first);
-      }
-    } else if (rawData is Map<String, dynamic>) {
-      userMap = rawData;
-    }
-
-    if (!userMap.containsKey('email') || userMap['email'] == null) {
-      userMap['email'] = creds.username;
-    }
-
-    return _parseUser(userMap);
   }
 
   // ── Yardımcı ──────────────────────────────────────────────────────────

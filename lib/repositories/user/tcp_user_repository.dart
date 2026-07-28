@@ -4,7 +4,7 @@ import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'user_repository.dart';
 
-/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri (Sadece Canlı Sunucu).
+/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri (PROTOKOL.md Tek Protokol).
 class TcpUserRepository implements UserRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
@@ -13,8 +13,12 @@ class TcpUserRepository implements UserRepository {
 
   TcpUserRepository(this._tcp, this._credentialsProvider);
 
-  Credentials? _getCreds() {
-    return _credentialsProvider();
+  Credentials _getCreds() {
+    final c = _credentialsProvider();
+    if (c == null || c.username.isEmpty || c.password.isEmpty) {
+      throw const TcpException('Oturum açılmamış (kullanıcı kimliği eksik).');
+    }
+    return c;
   }
 
   @override
@@ -23,12 +27,12 @@ class TcpUserRepository implements UserRepository {
     try {
       final response = await _tcp.send(
         action: 'LIST_USERS',
-        username: c?.username,
-        password: c?.password,
+        username: c.username,
+        password: c.password,
       );
 
       final rawData = response['data'];
-      if (rawData is List && rawData.isNotEmpty) {
+      if (rawData is List) {
         final fetched = rawData.map((item) {
           if (item is Map<String, dynamic>) return _parseUser(item);
           if (item is Map) return _parseUser(Map<String, dynamic>.from(item));
@@ -43,11 +47,8 @@ class TcpUserRepository implements UserRepository {
           );
         }).toList();
 
-        for (final u in fetched) {
-          if (!_localUsers.any((e) => e.id == u.id || e.email == u.email)) {
-            _localUsers.add(u);
-          }
-        }
+        _localUsers.clear();
+        _localUsers.addAll(fetched);
       }
     } catch (_) {}
 
@@ -80,108 +81,119 @@ class TcpUserRepository implements UserRepository {
     Set<String> departments = const {},
     Set<Permission> permissions = const {},
   }) async {
-    final newU = AppUser(
-      id: email,
-      name: name,
-      email: email,
-      role: UserRole.user,
-      departments: departments.isEmpty ? {'General'} : departments,
-      permissions: permissions.isEmpty ? Permission.values.toSet() : permissions,
-      isActive: true,
-      createdAt: DateTime.now(),
+    final c = _getCreds();
+
+    final response = await _tcp.send(
+      action: 'CREATE_USER',
+      username: c.username,
+      password: c.password,
+      document: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'departments': departments.toList(),
+        'permissions': permissions.map((p) => p.name).toList(),
+      },
     );
 
-    _localUsers.add(newU);
-
-    final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'CREATE_USER',
-        username: c?.username,
-        password: c?.password,
-        document: {
-          'name': name,
-          'email': email,
-          'password': password,
-          'departments': departments.toList(),
-          'permissions': permissions.map((p) => p.name).toList(),
-        },
+    final rawData = response['data'];
+    AppUser newU;
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) {
+        newU = _parseUser(first);
+      } else if (first is Map) {
+        newU = _parseUser(Map<String, dynamic>.from(first));
+      } else {
+        newU = AppUser(
+          id: email,
+          name: name,
+          email: email,
+          role: UserRole.user,
+          departments: departments.isEmpty ? {'General'} : departments,
+          permissions: permissions.isEmpty ? Permission.values.toSet() : permissions,
+          isActive: true,
+          createdAt: DateTime.now(),
+        );
+      }
+    } else {
+      newU = AppUser(
+        id: email,
+        name: name,
+        email: email,
+        role: UserRole.user,
+        departments: departments.isEmpty ? {'General'} : departments,
+        permissions: permissions.isEmpty ? Permission.values.toSet() : permissions,
+        isActive: true,
+        createdAt: DateTime.now(),
       );
-    } catch (_) {}
+    }
 
+    _localUsers.add(newU);
     return newU;
   }
 
   @override
   Future<AppUser> updateUser(AppUser user) async {
+    final c = _getCreds();
+
+    await _tcp.send(
+      action: 'UPDATE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': user.id},
+      document: _serializeUser(user),
+    );
+
     final index = _localUsers.indexWhere((u) => u.id == user.id || u.email == user.email);
     if (index != -1) {
       _localUsers[index] = user;
     }
-
-    final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'UPDATE_USER',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': user.id},
-        document: _serializeUser(user),
-      );
-    } catch (_) {}
 
     return user;
   }
 
   @override
   Future<void> softDeleteUser(String id) async {
-    final index = _localUsers.indexWhere((u) => u.id == id || u.email == id);
-    if (index != -1) {
-      _localUsers[index] = _localUsers[index].copyWith(isActive: false);
-    }
-
     final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'DELETE_USER',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': id},
-      );
-    } catch (_) {}
+    _localUsers.removeWhere((u) => u.id == id || u.email == id);
+
+    await _tcp.send(
+      action: 'DELETE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
+    );
   }
 
   @override
   Future<void> restoreUser(String id) async {
+    final c = _getCreds();
+
+    await _tcp.send(
+      action: 'RESTORE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
+    );
+
     final index = _localUsers.indexWhere((u) => u.id == id || u.email == id);
     if (index != -1) {
       _localUsers[index] = _localUsers[index].copyWith(isActive: true);
     }
-
-    final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'RESTORE_USER',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': id},
-      );
-    } catch (_) {}
   }
 
   @override
   Future<void> permanentlyDeleteUser(String id) async {
+    final c = _getCreds();
     _localUsers.removeWhere((u) => u.id == id || u.email == id);
 
-    final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'DROP_USER',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': id},
-      );
-    } catch (_) {}
+    await _tcp.send(
+      action: 'DROP_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
+    );
   }
 
   @override
@@ -190,6 +202,19 @@ class TcpUserRepository implements UserRepository {
     required Set<String> departments,
     required Set<Permission> permissions,
   }) async {
+    final c = _getCreds();
+
+    await _tcp.send(
+      action: 'UPDATE_USER_PERMISSIONS',
+      username: c.username,
+      password: c.password,
+      filter: {'id': userId},
+      document: {
+        'departments': departments.toList(),
+        'permissions': permissions.map((p) => p.name).toList(),
+      },
+    );
+
     final index = _localUsers.indexWhere((u) => u.id == userId || u.email == userId);
     AppUser updated;
     if (index != -1) {
@@ -211,34 +236,18 @@ class TcpUserRepository implements UserRepository {
       _localUsers.add(updated);
     }
 
-    final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'UPDATE_USER_PERMISSIONS',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': userId},
-        document: {
-          'departments': departments.toList(),
-          'permissions': permissions.map((p) => p.name).toList(),
-        },
-      );
-    } catch (_) {}
-
     return updated;
   }
 
   @override
   Future<void> forcePasswordReset(String userId) async {
     final c = _getCreds();
-    try {
-      await _tcp.send(
-        action: 'RESET_USER_PASSWORD',
-        username: c?.username,
-        password: c?.password,
-        filter: {'id': userId},
-      );
-    } catch (_) {}
+    await _tcp.send(
+      action: 'RESET_USER_PASSWORD',
+      username: c.username,
+      password: c.password,
+      filter: {'id': userId},
+    );
   }
 
   // ── Yardımcılar ─────────────────────────────────────────────────────────

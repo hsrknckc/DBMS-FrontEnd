@@ -26,13 +26,13 @@ class TcpConfig {
   const TcpConfig({
     this.host = '54.154.220.190',
     this.port = 5150,
-    this.connectTimeout = const Duration(seconds: 3),
+    this.connectTimeout = const Duration(seconds: 4),
     this.requestTimeout = const Duration(seconds: 4),
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TCP Soket Servisi (Persist & Multiplexed Async Requests)
+// TCP Soket Servisi (PROTOKOL.md Tek Protokol)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class TcpSocketService {
@@ -55,10 +55,17 @@ class TcpSocketService {
   final StreamController<TcpConnectionState> _stateController =
       StreamController<TcpConnectionState>.broadcast();
 
+  /// Olay (Event/Push) mesajları akışı
+  final StreamController<Map<String, dynamic>> _eventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   TcpSocketService({TcpConfig? config}) : config = config ?? const TcpConfig();
 
   /// Bağlantı durumu akışı
   Stream<TcpConnectionState> get connectionState => _stateController.stream;
+
+  /// Olay (Push) mesajları akışı
+  Stream<Map<String, dynamic>> get events => _eventController.stream;
 
   TcpConnectionState _currentState = TcpConnectionState.disconnected;
 
@@ -114,6 +121,7 @@ class TcpSocketService {
     _failAllPending('Bağlantı kullanıcı tarafından kapatıldı.');
     await _closeSocket();
     await _stateController.close();
+    await _eventController.close();
   }
 
   Future<void> _closeSocket() async {
@@ -153,17 +161,28 @@ class TcpSocketService {
       if (decoded is Map<String, dynamic>) {
         jsonMap = decoded;
       } else if (decoded is List) {
-        jsonMap = {'data': decoded, 'status': 'OK', 'ok': true};
+        jsonMap = {'data': decoded, 'status': 'OK'};
       } else if (decoded is Map) {
         jsonMap = Map<String, dynamic>.from(decoded);
       } else {
-        jsonMap = {'data': decoded, 'status': 'OK', 'ok': true};
+        jsonMap = {'data': decoded, 'status': 'OK'};
+      }
+
+      final reqId = jsonMap['requestId']?.toString();
+      final type = jsonMap['type']?.toString();
+
+      // Push / Event Mesajı Ayrımı (requestId yoksa olaydır)
+      if (reqId == null || reqId.isEmpty || type == 'event') {
+        if (!_eventController.isClosed) {
+          _eventController.add(jsonMap);
+        }
+        return;
       }
 
       final response = DbResponse.fromJson(jsonMap);
 
       Completer<DbResponse>? completer;
-      if (response.requestId.isNotEmpty && _pendingRequests.containsKey(response.requestId)) {
+      if (_pendingRequests.containsKey(response.requestId)) {
         completer = _pendingRequests.remove(response.requestId);
       } else if (_pendingRequests.isNotEmpty) {
         final firstKey = _pendingRequests.keys.first;
@@ -181,9 +200,8 @@ class TcpSocketService {
         if (completer != null && !completer.isCompleted) {
           completer.complete(DbResponse(
             requestId: firstKey,
-            ok: true,
             status: 'OK',
-            data: line,
+            data: [line],
           ));
         }
       }
@@ -253,7 +271,6 @@ class TcpSocketService {
       rethrow;
     }
 
-    // Zaman aşımı süresi 4 saniyeye düşürüldü (Kullanıcı yüklemede takılmasın)
     return completer.future.timeout(
       config.requestTimeout,
       onTimeout: () {
@@ -265,17 +282,15 @@ class TcpSocketService {
     );
   }
 
-  /// Esnek İstek Metodu
+  /// PROTOKOL.md Standart Tek Protokol Gönderim Metodu
   Future<Map<String, dynamic>> send({
     required String action,
-    String? username,
-    String? password,
+    required String username,
+    required String password,
     String? database,
     String? collection,
     Map<String, dynamic>? filter,
     Map<String, dynamic>? document,
-    String? token,
-    Map<String, dynamic>? payload,
   }) async {
     final req = DbRequest(
       requestId: _uuid.v4(),
@@ -286,26 +301,22 @@ class TcpSocketService {
       collection: collection,
       filter: filter,
       document: document,
-      token: token,
-      payload: payload,
     );
 
     final res = await sendRequest(req);
 
-    if (!res.isOk) {
+    if (res.status != 'OK') {
       throw TcpException(
-        res.error ?? res.message ?? 'Sunucu hatası: $action başarısız oldu.',
+        res.message ?? 'İşlem başarısız: $action',
         res,
       );
     }
 
     return {
       'requestId': res.requestId,
-      'ok': res.isOk,
-      'status': res.status ?? (res.isOk ? 'OK' : 'ERROR'),
-      'message': res.message ?? res.error,
-      'error': res.error,
-      'data': res.data,
+      'status': res.status ?? 'OK',
+      'message': res.message ?? 'Başarılı',
+      'data': res.data ?? [],
     };
   }
 }
