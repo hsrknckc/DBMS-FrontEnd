@@ -49,8 +49,17 @@ class DataExplorerNotifier extends AsyncNotifier<List<DataRecord>> {
   }
 
   Future<void> updateRecord(DataRecord record) async {
+    final dbId = ref.read(selectedDatabaseIdProvider);
+    final collection = ref.read(selectedCollectionProvider);
+    final recToUpdate = (record.databaseId.isEmpty || record.collectionName.isEmpty)
+        ? record.copyWith(
+            databaseId: dbId ?? record.databaseId,
+            collectionName: collection ?? record.collectionName,
+          )
+        : record;
+
     final updated =
-        await ref.read(dataExplorerRepositoryProvider).updateRecord(record);
+        await ref.read(dataExplorerRepositoryProvider).updateRecord(recToUpdate);
     state = AsyncData(
       (state.value ?? [])
           .map((r) => r.id == updated.id ? updated : r)
@@ -59,7 +68,13 @@ class DataExplorerNotifier extends AsyncNotifier<List<DataRecord>> {
   }
 
   Future<void> deleteRecord(String id) async {
-    await ref.read(dataExplorerRepositoryProvider).deleteRecord(id);
+    final dbId = ref.read(selectedDatabaseIdProvider);
+    final collection = ref.read(selectedCollectionProvider);
+    await ref.read(dataExplorerRepositoryProvider).deleteRecord(
+          id,
+          databaseId: dbId,
+          collectionName: collection,
+        );
     state = AsyncData(
       (state.value ?? []).where((r) => r.id != id).toList(),
     );

@@ -109,12 +109,12 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         action: 'READ',
         username: c?.username,
         password: c?.password,
-        filter: {'id': id},
+        filter: {'id': id, '_id': id},
       );
     } catch (_) {
       response = await _tcp.send(
         action: 'records.getById',
-        payload: {'id': id},
+        payload: {'id': id, '_id': id},
       );
     }
 
@@ -195,7 +195,7 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         password: c?.password,
         database: record.databaseId,
         collection: record.collectionName,
-        filter: {'id': record.id},
+        filter: {'id': record.id, '_id': record.id},
         document: record.data,
       );
     } catch (_) {
@@ -203,8 +203,13 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         action: 'records.update',
         payload: {
           'id': record.id,
+          '_id': record.id,
+          'database': record.databaseId,
           'databaseId': record.databaseId,
+          'collection': record.collectionName,
           'collectionName': record.collectionName,
+          'filter': {'id': record.id, '_id': record.id},
+          'document': record.data,
           'data': record.data,
         },
       );
@@ -236,15 +241,19 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
         password: c?.password,
         database: databaseId,
         collection: collectionName,
-        filter: {'id': id},
+        filter: {'id': id, '_id': id},
       );
     } catch (_) {
       await _tcp.send(
         action: 'records.delete',
         payload: {
           'id': id,
+          '_id': id,
+          if (databaseId != null) 'database': databaseId,
           if (databaseId != null) 'databaseId': databaseId,
+          if (collectionName != null) 'collection': collectionName,
           if (collectionName != null) 'collectionName': collectionName,
+          'filter': {'id': id, '_id': id},
         },
       );
     }

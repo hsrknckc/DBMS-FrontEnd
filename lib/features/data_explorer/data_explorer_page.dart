@@ -519,6 +519,25 @@ class _DataExplorerPageState
                         ),
                       ),
                     ],
+                    if (_canDelete && _selectedDatabase != null && _selectedCollection != null) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Seçili Collection\'ı Sil',
+                        child: InkWell(
+                          onTap: _showDeleteCollectionDialog,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                            ),
+                            child: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2040,6 +2059,69 @@ class _DataExplorerPageState
             ),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _showDeleteCollectionDialog() async {
+    final currentDb = _selectedDatabase;
+    final currentCol = _selectedCollection;
+    if (currentDb == null || currentCol == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Collection Silinsin mi?'),
+          content: Text("'$currentCol' koleksiyonu ve içindeki tüm kayıtlar silinecek. Emin misiniz?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sil'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        final creds = ref.read(credentialsProvider);
+        if (creds != null) {
+          final tcpRepo = ref.read(socketServiceProvider);
+          tcpRepo.send(
+            action: 'DROP_COLLECTION',
+            username: creds.username,
+            password: creds.password,
+            database: currentDb.name,
+            collection: currentCol,
+          ).catchError((_) => <String, dynamic>{});
+        }
+      } catch (_) {}
+
+      setState(() {
+        _serverCollections[currentDb.id]?.remove(currentCol);
+        _extraCollections[currentDb.id]?.remove(currentCol);
+        _selectedCollection = null;
+        _lastSelectedCollection = null;
+      });
+      ref.read(selectedCollectionProvider.notifier).state = null;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("'$currentCol' koleksiyonu silindi."),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
