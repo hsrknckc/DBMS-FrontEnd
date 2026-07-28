@@ -6,7 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'auth_repository.dart';
 
-/// TCP/IP soket üzerinden kimlik doğrulama işlemleri.
+/// TCP/IP soket üzerinden kimlik doğrulama işlemleri (Sadece Gerçek Sunucu Doğrulaması).
 class TcpAuthRepository implements AuthRepository {
   final TcpSocketService _tcp;
   final StateController<Credentials?>? _credentialsNotifier;
@@ -20,40 +20,45 @@ class TcpAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser> login(String email, String password) async {
+    Map<String, dynamic> response = {};
+    bool authenticated = false;
+
+    // 1. Yeni Protokol Dene (LOGIN with username & password)
+    try {
+      response = await _tcp.send(
+        action: 'LOGIN',
+        username: email,
+        password: password,
+      ).timeout(const Duration(seconds: 4));
+      if (response['ok'] == true || response['status'] == 'OK') {
+        authenticated = true;
+      }
+    } catch (_) {}
+
+    // 2. Canlı AWS Protokolü Dene (auth.login with payload)
+    if (!authenticated) {
+      try {
+        response = await _tcp.send(
+          action: 'auth.login',
+          payload: {'email': email, 'password': password},
+        ).timeout(const Duration(seconds: 4));
+        if (response['ok'] == true || response['status'] == 'OK') {
+          authenticated = true;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Sunucu doğrulaması yapılmadıysa kesinlikle içeri alma ve Hata Fırlat!
+    if (!authenticated) {
+      throw const TcpException(
+        'Giriş Başarısız: Sunucuda bu kullanıcı adı ve şifre ile eşleşen bir hesap bulunamadı veya sunucu bağlantısı kurulamadı.',
+      );
+    }
+
     final credentials = Credentials(email, password);
     _activeCredentials = credentials;
     if (_credentialsNotifier != null) {
       _credentialsNotifier.state = credentials;
-    }
-
-    Map<String, dynamic> response = {};
-    try {
-      // 1. Canlı AWS TCP sunucusu (auth.login with payload)
-      response = await _tcp.send(
-        action: 'auth.login',
-        payload: {'email': email, 'password': password},
-      );
-    } catch (_) {
-      try {
-        // 2. Yeni Java Sunucu Protokolü (LOGIN with username/password)
-        response = await _tcp.send(
-          action: 'LOGIN',
-          username: email,
-          password: password,
-        );
-      } catch (_) {
-        // Sunucu bağlantısı koptuğunda veya istek yanıt vermediğinde girilen bilgilerle oturumu aç
-        return AppUser(
-          id: email,
-          name: email.split('@').first,
-          email: email,
-          role: UserRole.superAdmin,
-          departments: {'General', 'IT'},
-          permissions: Permission.values.toSet(),
-          isActive: true,
-          createdAt: DateTime.now(),
-        );
-      }
     }
 
     final rawData = response['data'];
@@ -95,31 +100,28 @@ class TcpAuthRepository implements AuthRepository {
     final creds = _activeCredentials ?? _credentialsNotifier?.state;
     if (creds == null) return null;
 
-    Map<String, dynamic> response;
+    Map<String, dynamic> response = {};
     try {
       response = await _tcp.send(
-        action: 'auth.login',
-        payload: {'email': creds.username, 'password': creds.password},
-      );
+        action: 'LOGIN',
+        username: creds.username,
+        password: creds.password,
+      ).timeout(const Duration(seconds: 4));
     } catch (_) {
       try {
         response = await _tcp.send(
-          action: 'LOGIN',
-          username: creds.username,
-          password: creds.password,
-        );
+          action: 'auth.login',
+          payload: {'email': creds.username, 'password': creds.password},
+        ).timeout(const Duration(seconds: 4));
       } catch (_) {
-        return AppUser(
-          id: creds.username,
-          name: creds.username.split('@').first,
-          email: creds.username,
-          role: UserRole.superAdmin,
-          departments: {'General', 'IT'},
-          permissions: Permission.values.toSet(),
-          isActive: true,
-          createdAt: DateTime.now(),
-        );
+        await logout();
+        return null;
       }
+    }
+
+    if (response['ok'] != true && response['status'] != 'OK') {
+      await logout();
+      return null;
     }
 
     final rawData = response['data'];
