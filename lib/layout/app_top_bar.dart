@@ -8,7 +8,7 @@ class AppTopBar extends StatelessWidget {
   final ValueChanged<bool> onRoleChanged;
   final AppUser currentUser;
 
-  // Profil Bilgilerim ve Çıkış Yap aksiyonları için callback'ler eklendi
+  // Profil Bilgilerim ve Çıkış Yap aksiyonları için callback'ler
   final VoidCallback? onProfilePressed;
   final VoidCallback? onLogoutPressed;
 
@@ -27,13 +27,12 @@ class AppTopBar extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Yazı renklerini garanti altına alıyoruz (Çakışmaları önlemek için)
     final Color textColor = isDark ? Colors.white : AppColors.textPrimary;
     final Color subTextColor = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
 
     return Container(
-      height: 90, // Yüksekliği 80'den 90'a çıkararak sıkışıklığı giderdik
-      padding: const EdgeInsets.symmetric(horizontal: 28), // İç boşlukları genişlettik
+      height: 70,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
       decoration: BoxDecoration(
         color: theme.cardTheme.color ?? theme.colorScheme.surface,
         border: Border(
@@ -44,91 +43,22 @@ class AppTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 1. Sol Taraf: Sayfa Başlığı
-          Text(
-            pageTitle,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 24, // Başlığı biraz daha büyüttük
-              color: textColor,
-            ),
-          ),
-          const SizedBox(width: 48), // Başlık ile arama çubuğu arası boşluğu artırdık
+          // Sol taraf boş bırakıldı (Başlık ve arama çubuğu kaldırıldı)
+          const Spacer(),
 
-          // 2. Orta: Aktif Arama Çubuğu
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: 450, // Arama çubuğunu biraz daha genişlettik
-                height: 48, // Sıkışıklığı gidermek için yüksekliği artırdık
-                child: TextField(
-                  style: TextStyle(color: textColor, fontSize: 14), // Yazı rengini düzelttik
-                  onSubmitted: (value) {
-                    _showSnackBar(context, 'Aranan kelime: "$value"');
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Hızlı arama yapın...',
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.grey[400] : Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: isDark ? Colors.grey[400] : Colors.grey[500],
-                      size: 20,
-                    ),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF9FAFB),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.dividerColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.dividerColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 3. Sağ Taraf: Rol Değiştirici, Bildirimler ve Profil
+          // Sağ Taraf: Bildirimler ve Profil
           Row(
             children: [
-              // Süper Admin Modu Switch/Chip
-              Text(
-                'Super Admin:',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: subTextColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: isSuperAdminMode,
-                activeColor: AppColors.primary,
-                onChanged: onRoleChanged,
-              ),
-              const SizedBox(width: 24), // Boşlukları rahatlattık
-              
+              // Aktif Bildirim Butonu
+              _buildNotificationButton(context, textColor),
+              const SizedBox(width: 16),
+
               // Dikey Ayraç
               Container(
-                height: 28,
+                height: 24,
                 width: 1,
                 color: theme.dividerColor,
               ),
-              const SizedBox(width: 24),
-
-              // Aktif Bildirim Butonu
-              _buildNotificationButton(context, textColor),
               const SizedBox(width: 16),
 
               // Aktif Profil Menüsü
@@ -149,7 +79,7 @@ class AppTopBar extends StatelessWidget {
           Icon(
             Icons.notifications_none_outlined,
             color: iconColor,
-            size: 26,
+            size: 24,
           ),
           Positioned(
             right: 0,
@@ -180,17 +110,7 @@ class AppTopBar extends StatelessWidget {
             children: [
               Icon(Icons.backup_outlined, color: AppColors.success, size: 20),
               SizedBox(width: 8),
-              Expanded(child: Text('Veritabanı yedekleme işlemi başarıyla tamamlandı.')),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 2,
-          child: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('Yeni bir IP adresinden giriş denemesi yapıldı.')),
+              Expanded(child: Text('Veritabanı bağlantısı aktif.')),
             ],
           ),
         ),
@@ -209,22 +129,22 @@ class AppTopBar extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              radius: 20,
+              radius: 18,
               backgroundColor: AppColors.primary,
               child: Text(
                 currentUser.initials,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text(
               currentUser.name,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: textColor,
               ),
@@ -277,19 +197,16 @@ class AppTopBar extends StatelessWidget {
       ],
       onSelected: (value) {
         if (value == 1) {
-          // Profil Bilgilerim seçildiğinde dışarıya haber verir
           if (onProfilePressed != null) {
             onProfilePressed!();
           } else {
-          
             _showSnackBar(context, 'Profil menüsü tıklandı.');
           }
         } else if (value == 2) {
-          // Çıkış Yap seçildiğinde dışarıya haber verir
           if (onLogoutPressed != null) {
             onLogoutPressed!();
           } else {
-            _showSnackBar(context, 'Çıkış yapıldı! (Simüle Edildi)');
+            _showSnackBar(context, 'Çıkış yapıldı.');
           }
         }
       },
