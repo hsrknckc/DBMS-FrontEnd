@@ -3,27 +3,15 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/database_item.dart';
 import 'database_repository.dart';
 
-/// TCP/IP soket üzerinden database CRUD işlemleri (Yeni Tek Protokol).
-///
-/// Aksiyonlar:
-///   LIST_DATABASES_INFO  → Üst verilerle veritabanlarını listeler
-///   CREATE_DATABASE      → database: ad, document: {department, description}
-///   UPDATE_DATABASE      → database: ad, document: {...}
-///   DELETE_DATABASE      → database: ad (soft delete)
-///   RESTORE_DATABASE     → database: ad
-///   DROP_DATABASE        → database: ad (kalıcı silme)
+/// TCP/IP soket üzerinden database CRUD işlemleri.
 class TcpDatabaseRepository implements DatabaseRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
 
   TcpDatabaseRepository(this._tcp, this._credentialsProvider);
 
-  Credentials _getCreds() {
-    final c = _credentialsProvider();
-    if (c == null) {
-      throw const TcpException('Oturum açılmamış (kimlik bilgisi eksik).');
-    }
-    return c;
+  Credentials? _getCreds() {
+    return _credentialsProvider();
   }
 
   @override
@@ -33,15 +21,22 @@ class TcpDatabaseRepository implements DatabaseRepository {
     try {
       response = await _tcp.send(
         action: 'LIST_DATABASES_INFO',
-        username: c.username,
-        password: c.password,
+        username: c?.username,
+        password: c?.password,
       );
     } catch (_) {
-      response = await _tcp.send(
-        action: 'LIST_DATABASES',
-        username: c.username,
-        password: c.password,
-      );
+      try {
+        response = await _tcp.send(
+          action: 'LIST_DATABASES',
+          username: c?.username,
+          password: c?.password,
+        );
+      } catch (_) {
+        response = await _tcp.send(
+          action: 'databases.list',
+          payload: {'includeDeleted': includeDeleted},
+        );
+      }
     }
 
     final rawData = response['data'];
@@ -104,22 +99,36 @@ class TcpDatabaseRepository implements DatabaseRepository {
     required String description,
   }) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'CREATE_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: name,
-      document: {
-        'department': department,
-        'description': description,
-      },
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'CREATE_DATABASE',
+        username: c?.username,
+        password: c?.password,
+        database: name,
+        document: {
+          'department': department,
+          'description': description,
+        },
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'databases.create',
+        payload: {
+          'name': name,
+          'department': department,
+          'description': description,
+        },
+      );
+    }
 
     final rawData = response['data'];
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return _parseDb(first);
       if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
+    } else if (rawData is Map<String, dynamic>) {
+      return _parseDb(rawData);
     }
 
     return DatabaseItem(
@@ -137,19 +146,29 @@ class TcpDatabaseRepository implements DatabaseRepository {
   @override
   Future<DatabaseItem> updateDatabase(DatabaseItem item) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'UPDATE_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: item.name,
-      document: _serializeDb(item),
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'UPDATE_DATABASE',
+        username: c?.username,
+        password: c?.password,
+        database: item.name,
+        document: _serializeDb(item),
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'databases.update',
+        payload: _serializeDb(item),
+      );
+    }
 
     final rawData = response['data'];
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return _parseDb(first);
       if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
+    } else if (rawData is Map<String, dynamic>) {
+      return _parseDb(rawData);
     }
 
     return item;
@@ -158,34 +177,55 @@ class TcpDatabaseRepository implements DatabaseRepository {
   @override
   Future<void> softDeleteDatabase(String id) async {
     final c = _getCreds();
-    await _tcp.send(
-      action: 'DELETE_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: id,
-    );
+    try {
+      await _tcp.send(
+        action: 'DELETE_DATABASE',
+        username: c?.username,
+        password: c?.password,
+        database: id,
+      );
+    } catch (_) {
+      await _tcp.send(
+        action: 'databases.softDelete',
+        payload: {'id': id},
+      );
+    }
   }
 
   @override
   Future<void> restoreDatabase(String id) async {
     final c = _getCreds();
-    await _tcp.send(
-      action: 'RESTORE_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: id,
-    );
+    try {
+      await _tcp.send(
+        action: 'RESTORE_DATABASE',
+        username: c?.username,
+        password: c?.password,
+        database: id,
+      );
+    } catch (_) {
+      await _tcp.send(
+        action: 'databases.restore',
+        payload: {'id': id},
+      );
+    }
   }
 
   @override
   Future<void> permanentlyDeleteDatabase(String id) async {
     final c = _getCreds();
-    await _tcp.send(
-      action: 'DROP_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: id,
-    );
+    try {
+      await _tcp.send(
+        action: 'DROP_DATABASE',
+        username: c?.username,
+        password: c?.password,
+        database: id,
+      );
+    } catch (_) {
+      await _tcp.send(
+        action: 'databases.permanentDelete',
+        payload: {'id': id},
+      );
+    }
   }
 
   // ── Yardımcılar ─────────────────────────────────────────────────────────

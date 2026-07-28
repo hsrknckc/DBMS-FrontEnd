@@ -240,8 +240,8 @@ class TcpSocketService {
   /// Yardımcı metot: Parametrelerle hızlıca [DbRequest] oluşturup gönderir.
   Future<DbResponse> execute({
     required String action,
-    required String username,
-    required String password,
+    String? username,
+    String? password,
     String? database,
     String? collection,
     Map<String, dynamic>? filter,
@@ -262,17 +262,17 @@ class TcpSocketService {
     return sendRequest(req);
   }
 
-  /// Yeni Protokol İstek Metodu
-  /// Zarf: `{"requestId": "...", "action": "...", "username": "...", "password": "...", ...}`
-  /// Yanıt: `{"requestId": "...", "status": "OK", "message": "...", "data": [...]}`
+  /// Esnek İstek Metodu (Canlı AWS TCP + Yeni Java Protokolü Uyumlu)
   Future<Map<String, dynamic>> send({
     required String action,
-    required String username,
-    required String password,
+    String? username,
+    String? password,
     String? database,
     String? collection,
     Map<String, dynamic>? filter,
     Map<String, dynamic>? document,
+    String? token,
+    Map<String, dynamic>? payload,
   }) async {
     final req = DbRequest(
       requestId: _uuid.v4(),
@@ -283,21 +283,25 @@ class TcpSocketService {
       collection: collection,
       filter: filter,
       document: document,
+      token: token,
+      payload: payload,
     );
 
     final res = await sendRequest(req);
 
     if (!res.isOk) {
       throw TcpException(
-        res.message ?? 'Sunucu hatası: $action başarısız oldu (${res.status}).',
+        res.error ?? res.message ?? 'Sunucu hatası: $action başarısız oldu.',
         res,
       );
     }
 
     return {
       'requestId': res.requestId,
-      'status': res.status ?? 'OK',
-      'message': res.message,
+      'ok': res.isOk,
+      'status': res.status ?? (res.isOk ? 'OK' : 'ERROR'),
+      'message': res.message ?? res.error,
+      'error': res.error,
       'data': res.data,
     };
   }

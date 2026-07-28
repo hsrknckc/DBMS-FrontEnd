@@ -3,29 +3,15 @@ import '../../core/services/tcp_socket_service.dart';
 import '../../models/data_record.dart';
 import 'data_explorer_repository.dart';
 
-/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Yeni Tek Protokol).
-///
-/// Aksiyonlar:
-///   PING              → MongoDB erişilebilirlik kontrolü
-///   LIST_COLLECTIONS  → database
-///   CREATE_COLLECTION → database, collection
-///   DROP_COLLECTION   → database, collection
-///   READ              → database, collection, filter
-///   WRITE             → database, collection, document
-///   UPDATE            → database, collection, filter, document
-///   DELETE            → database, collection, filter
+/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Yeni + Canlı TCP Sunucu Uyumlu).
 class TcpDataExplorerRepository implements DataExplorerRepository {
   final TcpSocketService _tcp;
   final Credentials? Function() _credentialsProvider;
 
   TcpDataExplorerRepository(this._tcp, this._credentialsProvider);
 
-  Credentials _getCreds() {
-    final c = _credentialsProvider();
-    if (c == null) {
-      throw const TcpException('Oturum açılmamış (kimlik bilgisi eksik).');
-    }
-    return c;
+  Credentials? _getCreds() {
+    return _credentialsProvider();
   }
 
   /// MongoDB erişilebilirlik kontrolü (PING)
@@ -34,10 +20,10 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
       final c = _getCreds();
       final response = await _tcp.send(
         action: 'PING',
-        username: c.username,
-        password: c.password,
+        username: c?.username,
+        password: c?.password,
       );
-      return response['status'] == 'OK';
+      return response['ok'] == true || response['status'] == 'OK';
     } catch (_) {
       return false;
     }
@@ -49,8 +35,8 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
       final c = _getCreds();
       final response = await _tcp.send(
         action: 'LIST_COLLECTIONS',
-        username: c.username,
-        password: c.password,
+        username: c?.username,
+        password: c?.password,
         database: databaseName,
       );
       final rawData = response['data'];
@@ -68,16 +54,29 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     String? searchQuery,
   }) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'READ',
-      username: c.username,
-      password: c.password,
-      database: databaseId,
-      collection: collectionName,
-      filter: (searchQuery != null && searchQuery.isNotEmpty)
-          ? {'searchQuery': searchQuery}
-          : {},
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'READ',
+        username: c?.username,
+        password: c?.password,
+        database: databaseId,
+        collection: collectionName,
+        filter: (searchQuery != null && searchQuery.isNotEmpty)
+            ? {'searchQuery': searchQuery}
+            : {},
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.list',
+        payload: {
+          'databaseId': databaseId,
+          'collectionName': collectionName,
+          if (searchQuery != null && searchQuery.isNotEmpty)
+            'searchQuery': searchQuery,
+        },
+      );
+    }
 
     final rawData = response['data'];
     if (rawData == null || rawData is! List) {
@@ -104,18 +103,28 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   @override
   Future<DataRecord> getRecordById(String id) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'READ',
-      username: c.username,
-      password: c.password,
-      filter: {'id': id},
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'READ',
+        username: c?.username,
+        password: c?.password,
+        filter: {'id': id},
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.getById',
+        payload: {'id': id},
+      );
+    }
 
     final rawData = response['data'];
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
       if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
+    } else if (rawData is Map<String, dynamic>) {
+      return DataRecord.fromJson(rawData);
     }
 
     return DataRecord(
@@ -135,20 +144,34 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required Map<String, dynamic> data,
   }) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'WRITE',
-      username: c.username,
-      password: c.password,
-      database: databaseId,
-      collection: collectionName,
-      document: data,
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'WRITE',
+        username: c?.username,
+        password: c?.password,
+        database: databaseId,
+        collection: collectionName,
+        document: data,
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.create',
+        payload: {
+          'databaseId': databaseId,
+          'collectionName': collectionName,
+          'data': data,
+        },
+      );
+    }
 
     final rawData = response['data'];
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
       if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
+    } else if (rawData is Map<String, dynamic>) {
+      return DataRecord.fromJson(rawData);
     }
 
     return DataRecord(
@@ -164,21 +187,36 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   @override
   Future<DataRecord> updateRecord(DataRecord record) async {
     final c = _getCreds();
-    final response = await _tcp.send(
-      action: 'UPDATE',
-      username: c.username,
-      password: c.password,
-      database: record.databaseId,
-      collection: record.collectionName,
-      filter: {'id': record.id},
-      document: record.data,
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'UPDATE',
+        username: c?.username,
+        password: c?.password,
+        database: record.databaseId,
+        collection: record.collectionName,
+        filter: {'id': record.id},
+        document: record.data,
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.update',
+        payload: {
+          'id': record.id,
+          'databaseId': record.databaseId,
+          'collectionName': record.collectionName,
+          'data': record.data,
+        },
+      );
+    }
 
     final rawData = response['data'];
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
       if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
+    } else if (rawData is Map<String, dynamic>) {
+      return DataRecord.fromJson(rawData);
     }
 
     return record;
@@ -191,14 +229,25 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     String? collectionName,
   }) async {
     final c = _getCreds();
-    await _tcp.send(
-      action: 'DELETE',
-      username: c.username,
-      password: c.password,
-      database: databaseId,
-      collection: collectionName,
-      filter: {'id': id},
-    );
+    try {
+      await _tcp.send(
+        action: 'DELETE',
+        username: c?.username,
+        password: c?.password,
+        database: databaseId,
+        collection: collectionName,
+        filter: {'id': id},
+      );
+    } catch (_) {
+      await _tcp.send(
+        action: 'records.delete',
+        payload: {
+          'id': id,
+          if (databaseId != null) 'databaseId': databaseId,
+          if (collectionName != null) 'collectionName': collectionName,
+        },
+      );
+    }
   }
 
   @override

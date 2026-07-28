@@ -6,10 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'auth_repository.dart';
 
-/// TCP/IP soket üzerinden kimlik doğrulama işlemleri (Yeni Tek Protokol).
-///
-/// Protokol aksiyonu:
-///   LOGIN → {username, password}
+/// TCP/IP soket üzerinden kimlik doğrulama işlemleri.
 class TcpAuthRepository implements AuthRepository {
   final TcpSocketService _tcp;
   final StateController<Credentials?>? _credentialsNotifier;
@@ -23,11 +20,21 @@ class TcpAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser> login(String email, String password) async {
-    final response = await _tcp.send(
-      action: 'LOGIN',
-      username: email,
-      password: password,
-    );
+    Map<String, dynamic> response;
+    try {
+      // 1. Canlı AWS TCP sunucusu (auth.login with payload)
+      response = await _tcp.send(
+        action: 'auth.login',
+        payload: {'email': email, 'password': password},
+      );
+    } catch (_) {
+      // 2. Yeni Java Sunucu Protokolü (LOGIN with username/password)
+      response = await _tcp.send(
+        action: 'LOGIN',
+        username: email,
+        password: password,
+      );
+    }
 
     final credentials = Credentials(email, password);
     _activeCredentials = credentials;
@@ -49,7 +56,6 @@ class TcpAuthRepository implements AuthRepository {
       userMap = rawData;
     }
 
-    // E-posta dönmediyse istekle gönderilen email'i yedekle
     if (!userMap.containsKey('email') || userMap['email'] == null) {
       userMap['email'] = email;
     }
@@ -75,35 +81,43 @@ class TcpAuthRepository implements AuthRepository {
     final creds = _activeCredentials ?? _credentialsNotifier?.state;
     if (creds == null) return null;
 
+    Map<String, dynamic> response;
     try {
-      final response = await _tcp.send(
-        action: 'LOGIN',
-        username: creds.username,
-        password: creds.password,
+      response = await _tcp.send(
+        action: 'auth.login',
+        payload: {'email': creds.username, 'password': creds.password},
       );
-
-      final rawData = response['data'];
-      Map<String, dynamic> userMap = {};
-      if (rawData is List && rawData.isNotEmpty) {
-        final first = rawData.first;
-        if (first is Map<String, dynamic>) {
-          userMap = first;
-        } else if (first is Map) {
-          userMap = Map<String, dynamic>.from(first);
-        }
-      } else if (rawData is Map<String, dynamic>) {
-        userMap = rawData;
-      }
-
-      if (!userMap.containsKey('email') || userMap['email'] == null) {
-        userMap['email'] = creds.username;
-      }
-
-      return _parseUser(userMap);
     } catch (_) {
-      await logout();
-      return null;
+      try {
+        response = await _tcp.send(
+          action: 'LOGIN',
+          username: creds.username,
+          password: creds.password,
+        );
+      } catch (_) {
+        await logout();
+        return null;
+      }
     }
+
+    final rawData = response['data'];
+    Map<String, dynamic> userMap = {};
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) {
+        userMap = first;
+      } else if (first is Map) {
+        userMap = Map<String, dynamic>.from(first);
+      }
+    } else if (rawData is Map<String, dynamic>) {
+      userMap = rawData;
+    }
+
+    if (!userMap.containsKey('email') || userMap['email'] == null) {
+      userMap['email'] = creds.username;
+    }
+
+    return _parseUser(userMap);
   }
 
   // ── Yardımcı ──────────────────────────────────────────────────────────
