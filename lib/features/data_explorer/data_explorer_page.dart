@@ -45,8 +45,8 @@ class _DataExplorerPageState
   bool _showJsonView = false;
   bool _isImporting = false;
 
-  final Map<String, Set<String>> _extraCollections = {};
-  final Map<String, List<String>> _serverCollections = {};
+  static final Map<String, Set<String>> _extraCollections = {};
+  static final Map<String, List<String>> _serverCollections = {};
   bool _collectionsLoading = false;
 
   /// Sunucudan LIST_COLLECTIONS ile koleksiyonları çeker ve cache'ler.
@@ -210,14 +210,20 @@ class _DataExplorerPageState
   @override
   void initState() {
     super.initState();
+    _selectedDatabaseId = ref.read(selectedDatabaseIdProvider) ?? _lastSelectedDatabaseId;
+    _selectedCollection = ref.read(selectedCollectionProvider) ?? _lastSelectedCollection;
   }
 
   void _ensureSelection(List<_ExplorerDatabase> databases) {
     if (databases.isEmpty) return;
 
-    if (_selectedDatabaseId == null ||
-        !databases.any((db) => db.id == _selectedDatabaseId)) {
-      if (_lastSelectedDatabaseId != null &&
+    final currentRefDb = ref.read(selectedDatabaseIdProvider);
+    final currentRefCol = ref.read(selectedCollectionProvider);
+
+    if (_selectedDatabaseId == null) {
+      if (currentRefDb != null && databases.any((db) => db.id == currentRefDb)) {
+        _selectedDatabaseId = currentRefDb;
+      } else if (_lastSelectedDatabaseId != null &&
           databases.any((db) => db.id == _lastSelectedDatabaseId)) {
         _selectedDatabaseId = _lastSelectedDatabaseId;
       } else {
@@ -230,14 +236,15 @@ class _DataExplorerPageState
       orElse: () => databases.first,
     );
 
-    // Sunucudan koleksiyonlar henüz çekilmemişse, çek
     if (!_serverCollections.containsKey(selectedDb.id)) {
       _loadCollectionsForDatabase(selectedDb.id, selectedDb.name);
     }
 
-    if (_selectedCollection == null ||
-        !selectedDb.collections.contains(_selectedCollection)) {
-      if (_lastSelectedCollection != null &&
+    if (_selectedCollection == null) {
+      if (currentRefCol != null &&
+          selectedDb.collections.contains(currentRefCol)) {
+        _selectedCollection = currentRefCol;
+      } else if (_lastSelectedCollection != null &&
           selectedDb.collections.contains(_lastSelectedCollection)) {
         _selectedCollection = _lastSelectedCollection;
       } else if (selectedDb.collections.isNotEmpty) {
@@ -250,8 +257,6 @@ class _DataExplorerPageState
     _lastSelectedDatabaseId = _selectedDatabaseId;
     _lastSelectedCollection = _selectedCollection;
 
-    final currentRefDb = ref.read(selectedDatabaseIdProvider);
-    final currentRefCol = ref.read(selectedCollectionProvider);
     if (currentRefDb != _selectedDatabaseId ||
         currentRefCol != _selectedCollection) {
       Future.microtask(() {
