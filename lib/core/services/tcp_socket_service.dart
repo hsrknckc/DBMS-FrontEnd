@@ -262,36 +262,42 @@ class TcpSocketService {
     return sendRequest(req);
   }
 
-  /// Ön Yüz (Flutter) Protokolü metodu
-  /// İstek formatı: `{"requestId": "...", "action": "...", "token": "...", "payload": {...}}`
-  /// Yanıt formatı: `{"requestId": "...", "ok": true/false, "data": ..., "error": ...}`
+  /// Yeni Protokol İstek Metodu
+  /// Zarf: `{"requestId": "...", "action": "...", "username": "...", "password": "...", ...}`
+  /// Yanıt: `{"requestId": "...", "status": "OK", "message": "...", "data": [...]}`
   Future<Map<String, dynamic>> send({
     required String action,
-    Map<String, dynamic> payload = const {},
-    String? token,
+    required String username,
+    required String password,
+    String? database,
+    String? collection,
+    Map<String, dynamic>? filter,
+    Map<String, dynamic>? document,
   }) async {
     final req = DbRequest(
       requestId: _uuid.v4(),
       action: action,
-      token: token,
-      payload: payload,
+      username: username,
+      password: password,
+      database: database,
+      collection: collection,
+      filter: filter,
+      document: document,
     );
 
     final res = await sendRequest(req);
 
     if (!res.isOk) {
       throw TcpException(
-        res.error ?? res.message ?? 'Sunucu hatası: $action başarısız oldu.',
+        res.message ?? 'Sunucu hatası: $action başarısız oldu (${res.status}).',
         res,
       );
     }
 
     return {
       'requestId': res.requestId,
-      'ok': res.isOk,
-      'status': res.status ?? (res.isOk ? 'OK' : 'ERROR'),
-      'message': res.message ?? res.error,
-      'error': res.error,
+      'status': res.status ?? 'OK',
+      'message': res.message,
       'data': res.data,
     };
   }

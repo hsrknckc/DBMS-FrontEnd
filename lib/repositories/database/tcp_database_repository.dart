@@ -1,37 +1,46 @@
+import '../../core/providers/repository_providers.dart';
 import '../../core/services/tcp_socket_service.dart';
 import '../../models/database_item.dart';
 import 'database_repository.dart';
 
-/// TCP/IP soket üzerinden database CRUD işlemleri.
+/// TCP/IP soket üzerinden database CRUD işlemleri (Yeni Tek Protokol).
 ///
-/// Protokol aksiyonları:
-///   databases.list           → {includeDeleted}
-///   databases.getById        → {id}
-///   databases.create         → {name, department, description}
-///   databases.update         → {database}
-///   databases.softDelete     → {id}
-///   databases.restore        → {id}
-///   databases.permanentDelete→ {id}
+/// Aksiyonlar:
+///   LIST_DATABASES_INFO  → Üst verilerle veritabanlarını listeler
+///   CREATE_DATABASE      → database: ad, document: {department, description}
+///   UPDATE_DATABASE      → database: ad, document: {...}
+///   DELETE_DATABASE      → database: ad (soft delete)
+///   RESTORE_DATABASE     → database: ad
+///   DROP_DATABASE        → database: ad (kalıcı silme)
 class TcpDatabaseRepository implements DatabaseRepository {
   final TcpSocketService _tcp;
-  final String? Function() _tokenProvider;
+  final Credentials? Function() _credentialsProvider;
 
-  TcpDatabaseRepository(this._tcp, this._tokenProvider);
+  TcpDatabaseRepository(this._tcp, this._credentialsProvider);
+
+  Credentials _getCreds() {
+    final c = _credentialsProvider();
+    if (c == null) {
+      throw const TcpException('Oturum açılmamış (kimlik bilgisi eksik).');
+    }
+    return c;
+  }
 
   @override
   Future<List<DatabaseItem>> getDatabases({bool includeDeleted = false}) async {
+    final c = _getCreds();
     Map<String, dynamic> response;
     try {
       response = await _tcp.send(
-        action: 'LIST_DATABASES',
-        payload: {},
-        token: _tokenProvider(),
+        action: 'LIST_DATABASES_INFO',
+        username: c.username,
+        password: c.password,
       );
     } catch (_) {
       response = await _tcp.send(
-        action: 'databases.list',
-        payload: {'includeDeleted': includeDeleted},
-        token: _tokenProvider(),
+        action: 'LIST_DATABASES',
+        username: c.username,
+        password: c.password,
       );
     }
 
@@ -72,12 +81,20 @@ class TcpDatabaseRepository implements DatabaseRepository {
 
   @override
   Future<DatabaseItem> getDatabaseById(String id) async {
-    final response = await _tcp.send(
-      action: 'databases.getById',
-      payload: {'id': id},
-      token: _tokenProvider(),
+    final list = await getDatabases(includeDeleted: true);
+    return list.firstWhere(
+      (db) => db.id == id || db.name == id,
+      orElse: () => DatabaseItem(
+        id: id,
+        name: id,
+        department: 'General',
+        description: '',
+        collectionCount: 0,
+        recordCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
     );
-    return _parseDb(response['data'] as Map<String, dynamic>);
   }
 
   @override
@@ -86,62 +103,99 @@ class TcpDatabaseRepository implements DatabaseRepository {
     required String department,
     required String description,
   }) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'databases.create',
-      payload: {
-        'name': name,
+      action: 'CREATE_DATABASE',
+      username: c.username,
+      password: c.password,
+      database: name,
+      document: {
         'department': department,
         'description': description,
       },
-      token: _tokenProvider(),
     );
-    return _parseDb(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return _parseDb(first);
+      if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
+    }
+
+    return DatabaseItem(
+      id: name,
+      name: name,
+      department: department,
+      description: description,
+      collectionCount: 0,
+      recordCount: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
   }
 
   @override
   Future<DatabaseItem> updateDatabase(DatabaseItem item) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'databases.update',
-      payload: _serializeDb(item),
-      token: _tokenProvider(),
+      action: 'UPDATE_DATABASE',
+      username: c.username,
+      password: c.password,
+      database: item.name,
+      document: _serializeDb(item),
     );
-    return _parseDb(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return _parseDb(first);
+      if (first is Map) return _parseDb(Map<String, dynamic>.from(first));
+    }
+
+    return item;
   }
 
   @override
   Future<void> softDeleteDatabase(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'databases.softDelete',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'DELETE_DATABASE',
+      username: c.username,
+      password: c.password,
+      database: id,
     );
   }
 
   @override
   Future<void> restoreDatabase(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'databases.restore',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'RESTORE_DATABASE',
+      username: c.username,
+      password: c.password,
+      database: id,
     );
   }
 
   @override
   Future<void> permanentlyDeleteDatabase(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'databases.permanentDelete',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'DROP_DATABASE',
+      username: c.username,
+      password: c.password,
+      database: id,
     );
   }
 
   // ── Yardımcılar ─────────────────────────────────────────────────────────
 
   DatabaseItem _parseDb(Map<String, dynamic> data) {
+    final name = data['name']?.toString() ?? data['database']?.toString() ?? data['_id']?.toString() ?? '';
     return DatabaseItem(
-      id: data['_id']?.toString() ?? data['id']?.toString() ?? '',
-      name: data['name'] as String? ?? '',
-      department: data['department'] as String? ?? '',
+      id: data['_id']?.toString() ?? data['id']?.toString() ?? name,
+      name: name,
+      department: data['department'] as String? ?? 'General',
       description: data['description'] as String? ?? '',
       collectionCount: (data['collectionCount'] as num?)?.toInt() ?? 0,
       recordCount: (data['recordCount'] as num?)?.toInt() ?? 0,

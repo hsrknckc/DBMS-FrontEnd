@@ -1,70 +1,107 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
 import '../../core/services/tcp_socket_service.dart';
 import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'auth_repository.dart';
 
-/// TCP/IP soket üzerinden kimlik doğrulama işlemleri.
+/// TCP/IP soket üzerinden kimlik doğrulama işlemleri (Yeni Tek Protokol).
 ///
-/// Backend hazır olduğunda [MockAuthRepository] yerine bu sınıfı kullan:
-///   `repository_providers.dart` içinde tek satır değiştir.
-///
-/// Protokol aksiyonları:
-///   auth.login             → {email, password}
-///   auth.logout            → {token}
-///   auth.requestReset      → {email}
-///   auth.me                → {token}
+/// Protokol aksiyonu:
+///   LOGIN → {username, password}
 class TcpAuthRepository implements AuthRepository {
   final TcpSocketService _tcp;
+  final StateController<Credentials?>? _credentialsNotifier;
 
-  /// Oturum tokeni — login sonrası saklanır, diğer isteklerde kullanılır.
-  String? _token;
+  Credentials? _activeCredentials;
 
-  String? get token => _token;
-
-  TcpAuthRepository(this._tcp);
+  TcpAuthRepository(
+    this._tcp, {
+    StateController<Credentials?>? credentialsNotifier,
+  }) : _credentialsNotifier = credentialsNotifier;
 
   @override
   Future<AppUser> login(String email, String password) async {
     final response = await _tcp.send(
-      action: 'auth.login',
-      payload: {'email': email, 'password': password},
+      action: 'LOGIN',
+      username: email,
+      password: password,
     );
 
-    _token = response['data']?['token'] as String?;
-    return _parseUser(response['data'] as Map<String, dynamic>);
+    final credentials = Credentials(email, password);
+    _activeCredentials = credentials;
+    if (_credentialsNotifier != null) {
+      _credentialsNotifier.state = credentials;
+    }
+
+    final rawData = response['data'];
+    Map<String, dynamic> userMap = {};
+
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) {
+        userMap = first;
+      } else if (first is Map) {
+        userMap = Map<String, dynamic>.from(first);
+      }
+    } else if (rawData is Map<String, dynamic>) {
+      userMap = rawData;
+    }
+
+    // E-posta dönmediyse istekle gönderilen email'i yedekle
+    if (!userMap.containsKey('email') || userMap['email'] == null) {
+      userMap['email'] = email;
+    }
+
+    return _parseUser(userMap);
   }
 
   @override
   Future<void> logout() async {
-    await _tcp.send(
-      action: 'auth.logout',
-      payload: {},
-      token: _token,
-    );
-    _token = null;
+    _activeCredentials = null;
+    if (_credentialsNotifier != null) {
+      _credentialsNotifier.state = null;
+    }
   }
 
   @override
   Future<void> requestPasswordReset(String email) async {
-    await _tcp.send(
-      action: 'auth.requestReset',
-      payload: {'email': email},
-    );
+    // Sunucu tarafında parola sıfırlama endpoint'i bulunmuyor.
   }
 
   @override
   Future<AppUser?> getCurrentUser() async {
-    if (_token == null) return null;
+    final creds = _activeCredentials ?? _credentialsNotifier?.state;
+    if (creds == null) return null;
 
     try {
       final response = await _tcp.send(
-        action: 'auth.me',
-        payload: {},
-        token: _token,
+        action: 'LOGIN',
+        username: creds.username,
+        password: creds.password,
       );
-      return _parseUser(response['data'] as Map<String, dynamic>);
+
+      final rawData = response['data'];
+      Map<String, dynamic> userMap = {};
+      if (rawData is List && rawData.isNotEmpty) {
+        final first = rawData.first;
+        if (first is Map<String, dynamic>) {
+          userMap = first;
+        } else if (first is Map) {
+          userMap = Map<String, dynamic>.from(first);
+        }
+      } else if (rawData is Map<String, dynamic>) {
+        userMap = rawData;
+      }
+
+      if (!userMap.containsKey('email') || userMap['email'] == null) {
+        userMap['email'] = creds.username;
+      }
+
+      return _parseUser(userMap);
     } catch (_) {
-      _token = null;
+      await logout();
       return null;
     }
   }
@@ -91,7 +128,7 @@ class TcpAuthRepository implements AuthRepository {
 
     return AppUser(
       id: data['_id']?.toString() ?? data['id']?.toString() ?? '',
-      name: data['name'] as String? ?? '',
+      name: data['name'] as String? ?? (data['email'] as String? ?? '').split('@').first,
       email: data['email'] as String? ?? '',
       role: role,
       departments: deptList.toSet(),

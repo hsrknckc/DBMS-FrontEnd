@@ -63,24 +63,32 @@ final tcpSocketServiceProvider = socketServiceProvider;
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ── Credentials (Giriş Bilgileri) ─────────────────────────────────────────────
+
+/// Giriş yapan kullanıcının kimliği — TCP isteklerinde kullanıcı adı (tam e-posta) ve şifre gönderilir
+class Credentials {
+  final String username;
+  final String password;
+  const Credentials(this.username, this.password);
+}
+
+final credentialsProvider = StateProvider<Credentials?>((ref) => null);
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return TcpAuthRepository(ref.read(tcpSocketServiceProvider));
+  return TcpAuthRepository(
+    ref.read(tcpSocketServiceProvider),
+    credentialsNotifier: ref.read(credentialsProvider.notifier),
+  );
 });
-
-/// Token yardımcısı — TCP isteklerinde oturum token'ını sağlamak için
-String? _getToken(Ref ref) {
-  final repo = ref.read(authRepositoryProvider);
-  return repo is TcpAuthRepository ? repo.token : null;
-}
 
 // ── Kullanıcılar ─────────────────────────────────────────────────────────────
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   return TcpUserRepository(
     ref.read(tcpSocketServiceProvider),
-    () => _getToken(ref),
+    () => ref.read(credentialsProvider),
   );
 });
 
@@ -89,7 +97,7 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
 final databaseRepositoryProvider = Provider<DatabaseRepository>((ref) {
   return TcpDatabaseRepository(
     ref.read(tcpSocketServiceProvider),
-    () => _getToken(ref),
+    () => ref.read(credentialsProvider),
   );
 });
 
@@ -98,7 +106,7 @@ final databaseRepositoryProvider = Provider<DatabaseRepository>((ref) {
 final dataExplorerRepositoryProvider = Provider<DataExplorerRepository>((ref) {
   return TcpDataExplorerRepository(
     ref.read(tcpSocketServiceProvider),
-    () => _getToken(ref),
+    () => ref.read(credentialsProvider),
   );
 });
 
@@ -107,7 +115,7 @@ final dataExplorerRepositoryProvider = Provider<DataExplorerRepository>((ref) {
 final auditLogRepositoryProvider = Provider<AuditLogRepository>((ref) {
   return TcpAuditLogRepository(
     ref.read(tcpSocketServiceProvider),
-    () => _getToken(ref),
+    () => ref.read(credentialsProvider),
   );
 });
 
@@ -116,6 +124,6 @@ final auditLogRepositoryProvider = Provider<AuditLogRepository>((ref) {
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   return TcpDashboardRepository(
     ref.read(tcpSocketServiceProvider),
-    () => _getToken(ref),
+    () => ref.read(credentialsProvider),
   );
 });

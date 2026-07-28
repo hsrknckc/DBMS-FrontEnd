@@ -4,46 +4,31 @@ part 'db_response.g.dart';
 
 /// Backend TCP/IP soket sunucusundan dönen yanıt veri modeli (DTO).
 ///
-/// Ön Yüz (Flutter) Protokolü:
-///   `{"requestId": "...", "ok": true, "data": ...}`
-///   `{"requestId": "...", "ok": false, "error": "..."}`
-///
-/// Arka Yüz (Java) Protokolü:
-///   `{"requestId": "...", "status": "OK", "message": "...", "data": ...}`
+/// Yeni Protokol Yanıt Formatı:
+///   `{"requestId": "...", "status": "OK", "message": "...", "data": [...]}`
+///   `data` her zaman dizidir. Tek nesne dönen işlemlerde `data[0]` okunur.
 @JsonSerializable(includeIfNull: false)
 class DbResponse {
   final String requestId;
-
-  // Ön Yüz (Flutter) Protokol Alanları
-  final bool? ok;
-  final dynamic data;
-  final String? error;
-
-  // Arka Yüz (Java) Protokol Alanları
   final String? status;
   final String? message;
+  final dynamic data;
 
   const DbResponse({
     required this.requestId,
-    this.ok,
-    this.data,
-    this.error,
     this.status,
     this.message,
+    this.data,
   });
 
   /// Yanıt başarılı mı
-  bool get isOk => ok == true || status == 'OK';
+  bool get isOk => status == 'OK';
 
   /// Yetkilendirme hatası mı
-  bool get isUnauthorized =>
-      status == 'UNAUTHORIZED' ||
-      error == 'Not authenticated' ||
-      (error != null && error!.toLowerCase().contains('unauthorized')) ||
-      (error != null && error!.toLowerCase().contains('permission denied'));
+  bool get isUnauthorized => status == 'UNAUTHORIZED';
 
   /// Genel hata mı
-  bool get isError => ok == false || status == 'ERROR';
+  bool get isError => status == 'ERROR';
 
   factory DbResponse.fromJson(Map<String, dynamic> json) =>
       _$DbResponseFromJson(json);

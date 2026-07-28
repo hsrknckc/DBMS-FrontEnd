@@ -1,32 +1,43 @@
+import '../../core/providers/repository_providers.dart';
 import '../../core/services/tcp_socket_service.dart';
 import '../../models/data_record.dart';
 import 'data_explorer_repository.dart';
 
-/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri.
+/// TCP/IP soket üzerinden data explorer CRUD + export/import işlemleri (Yeni Tek Protokol).
 ///
-/// Protokol aksiyonları:
-///   records.list    → {databaseId, collectionName, searchQuery?}
-///   records.getById → {id}
-///   records.create  → {databaseId, collectionName, data}
-///   records.update  → {record}
-///   records.delete  → {id}
-///   records.export  → {databaseId, collectionName, format}
-///   records.import  → {databaseId, collectionName, records:[...]}
+/// Aksiyonlar:
+///   PING              → MongoDB erişilebilirlik kontrolü
+///   LIST_COLLECTIONS  → database
+///   CREATE_COLLECTION → database, collection
+///   DROP_COLLECTION   → database, collection
+///   READ              → database, collection, filter
+///   WRITE             → database, collection, document
+///   UPDATE            → database, collection, filter, document
+///   DELETE            → database, collection, filter
 class TcpDataExplorerRepository implements DataExplorerRepository {
   final TcpSocketService _tcp;
-  final String? Function() _tokenProvider;
+  final Credentials? Function() _credentialsProvider;
 
-  TcpDataExplorerRepository(this._tcp, this._tokenProvider);
+  TcpDataExplorerRepository(this._tcp, this._credentialsProvider);
+
+  Credentials _getCreds() {
+    final c = _credentialsProvider();
+    if (c == null) {
+      throw const TcpException('Oturum açılmamış (kimlik bilgisi eksik).');
+    }
+    return c;
+  }
 
   /// MongoDB erişilebilirlik kontrolü (PING)
   Future<bool> ping() async {
     try {
+      final c = _getCreds();
       final response = await _tcp.send(
         action: 'PING',
-        payload: {},
-        token: _tokenProvider(),
+        username: c.username,
+        password: c.password,
       );
-      return response['ok'] == true;
+      return response['status'] == 'OK';
     } catch (_) {
       return false;
     }
@@ -35,13 +46,12 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   /// Veritabanındaki koleksiyon adlarını çekme (LIST_COLLECTIONS)
   Future<List<String>> getCollections(String databaseName) async {
     try {
+      final c = _getCreds();
       final response = await _tcp.send(
         action: 'LIST_COLLECTIONS',
-        payload: {
-          'database': databaseName,
-          'databaseId': databaseName,
-        },
-        token: _tokenProvider(),
+        username: c.username,
+        password: c.password,
+        database: databaseName,
       );
       final rawData = response['data'];
       if (rawData is List) {
@@ -57,52 +67,65 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     String? searchQuery,
   }) async {
-    Map<String, dynamic> response;
-    try {
-      response = await _tcp.send(
-        action: 'READ',
-        payload: {
-          'database': databaseId,
-          'databaseId': databaseId,
-          'collection': collectionName,
-          'collectionName': collectionName,
-          'filter': searchQuery != null && searchQuery.isNotEmpty
-              ? {'searchQuery': searchQuery}
-              : {},
-        },
-        token: _tokenProvider(),
-      );
-    } catch (_) {
-      response = await _tcp.send(
-        action: 'records.list',
-        payload: {
-          'database': databaseId,
-          'databaseId': databaseId,
-          'collection': collectionName,
-          'collectionName': collectionName,
-          if (searchQuery != null && searchQuery.isNotEmpty)
-            'searchQuery': searchQuery,
-        },
-        token: _tokenProvider(),
-      );
-    }
+    final c = _getCreds();
+    final response = await _tcp.send(
+      action: 'READ',
+      username: c.username,
+      password: c.password,
+      database: databaseId,
+      collection: collectionName,
+      filter: (searchQuery != null && searchQuery.isNotEmpty)
+          ? {'searchQuery': searchQuery}
+          : {},
+    );
 
     final rawData = response['data'];
     if (rawData == null || rawData is! List) {
       return [];
     }
-    final list = rawData.cast<Map<String, dynamic>>();
-    return list.map(DataRecord.fromJson).toList();
+
+    return rawData.map((doc) {
+      if (doc is Map<String, dynamic>) {
+        return DataRecord.fromJson(doc);
+      } else if (doc is Map) {
+        return DataRecord.fromJson(Map<String, dynamic>.from(doc));
+      }
+      return DataRecord(
+        id: doc.toString(),
+        databaseId: databaseId,
+        collectionName: collectionName,
+        data: {'value': doc},
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }).toList();
   }
 
   @override
   Future<DataRecord> getRecordById(String id) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'records.getById',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'READ',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
     );
-    return DataRecord.fromJson(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
+      if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
+    }
+
+    return DataRecord(
+      id: id,
+      databaseId: '',
+      collectionName: '',
+      data: {},
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
   }
 
   @override
@@ -111,39 +134,23 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     required Map<String, dynamic> data,
   }) async {
-    Map<String, dynamic> response;
-    try {
-      response = await _tcp.send(
-        action: 'WRITE',
-        payload: {
-          'database': databaseId,
-          'databaseId': databaseId,
-          'collection': collectionName,
-          'collectionName': collectionName,
-          'document': data,
-          'data': data,
-        },
-        token: _tokenProvider(),
-      );
-    } catch (_) {
-      response = await _tcp.send(
-        action: 'records.create',
-        payload: {
-          'database': databaseId,
-          'databaseId': databaseId,
-          'collection': collectionName,
-          'collectionName': collectionName,
-          'document': data,
-          'data': data,
-        },
-        token: _tokenProvider(),
-      );
+    final c = _getCreds();
+    final response = await _tcp.send(
+      action: 'WRITE',
+      username: c.username,
+      password: c.password,
+      database: databaseId,
+      collection: collectionName,
+      document: data,
+    );
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
+      if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
     }
 
-    final resData = response['data'];
-    if (resData is Map<String, dynamic>) {
-      return DataRecord.fromJson(resData);
-    }
     return DataRecord(
       id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
       databaseId: databaseId,
@@ -156,42 +163,24 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
 
   @override
   Future<DataRecord> updateRecord(DataRecord record) async {
-    Map<String, dynamic> response;
-    try {
-      response = await _tcp.send(
-        action: 'UPDATE',
-        payload: {
-          'id': record.id,
-          'database': record.databaseId,
-          'databaseId': record.databaseId,
-          'collection': record.collectionName,
-          'collectionName': record.collectionName,
-          'filter': {'id': record.id},
-          'document': record.data,
-          'data': record.data,
-        },
-        token: _tokenProvider(),
-      );
-    } catch (_) {
-      response = await _tcp.send(
-        action: 'records.update',
-        payload: {
-          'id': record.id,
-          'database': record.databaseId,
-          'databaseId': record.databaseId,
-          'collection': record.collectionName,
-          'collectionName': record.collectionName,
-          'document': record.data,
-          'data': record.data,
-        },
-        token: _tokenProvider(),
-      );
+    final c = _getCreds();
+    final response = await _tcp.send(
+      action: 'UPDATE',
+      username: c.username,
+      password: c.password,
+      database: record.databaseId,
+      collection: record.collectionName,
+      filter: {'id': record.id},
+      document: record.data,
+    );
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
+      if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
     }
 
-    final resData = response['data'];
-    if (resData is Map<String, dynamic>) {
-      return DataRecord.fromJson(resData);
-    }
     return record;
   }
 
@@ -201,32 +190,15 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     String? databaseId,
     String? collectionName,
   }) async {
-    try {
-      await _tcp.send(
-        action: 'DELETE',
-        payload: {
-          'id': id,
-          'filter': {'id': id},
-          if (databaseId != null) 'database': databaseId,
-          if (databaseId != null) 'databaseId': databaseId,
-          if (collectionName != null) 'collection': collectionName,
-          if (collectionName != null) 'collectionName': collectionName,
-        },
-        token: _tokenProvider(),
-      );
-    } catch (_) {
-      await _tcp.send(
-        action: 'records.delete',
-        payload: {
-          'id': id,
-          if (databaseId != null) 'database': databaseId,
-          if (databaseId != null) 'databaseId': databaseId,
-          if (collectionName != null) 'collection': collectionName,
-          if (collectionName != null) 'collectionName': collectionName,
-        },
-        token: _tokenProvider(),
-      );
-    }
+    final c = _getCreds();
+    await _tcp.send(
+      action: 'DELETE',
+      username: c.username,
+      password: c.password,
+      database: databaseId,
+      collection: collectionName,
+      filter: {'id': id},
+    );
   }
 
   @override
@@ -235,17 +207,11 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     required String format,
   }) async {
-    final response = await _tcp.send(
-      action: 'records.export',
-      payload: {
-        'databaseId': databaseId,
-        'collectionName': collectionName,
-        'format': format,
-      },
-      token: _tokenProvider(),
+    final records = await getRecords(
+      databaseId: databaseId,
+      collectionName: collectionName,
     );
-    // Sunucu dosya içeriği veya indirme URL'i döner
-    return response['data']?.toString() ?? '';
+    return records.map((r) => r.toJson()).toList().toString();
   }
 
   @override
@@ -254,16 +220,17 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     required List<Map<String, dynamic>> records,
   }) async {
-    final response = await _tcp.send(
-      action: 'records.import',
-      payload: {
-        'databaseId': databaseId,
-        'collectionName': collectionName,
-        'records': records,
-      },
-      token: _tokenProvider(),
-    );
-    return (response['data']?['importedCount'] as num?)?.toInt() ??
-        records.length;
+    int count = 0;
+    for (final rec in records) {
+      try {
+        await createRecord(
+          databaseId: databaseId,
+          collectionName: collectionName,
+          data: rec,
+        );
+        count++;
+      } catch (_) {}
+    }
+    return count;
   }
 }

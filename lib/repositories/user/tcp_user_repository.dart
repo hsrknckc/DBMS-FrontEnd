@@ -1,45 +1,72 @@
+import '../../core/providers/repository_providers.dart';
 import '../../core/services/tcp_socket_service.dart';
 import '../../models/app_user.dart';
 import '../../models/permission.dart';
 import 'user_repository.dart';
 
-/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri.
+/// TCP/IP soket üzerinden kullanıcı CRUD işlemleri (Yeni Tek Protokol).
 ///
-/// Protokol aksiyonları:
-///   users.list             → {includeDeleted}
-///   users.getById          → {id}
-///   users.create           → {name, email, password, departments, permissions}
-///   users.update           → {user}
-///   users.softDelete       → {id}
-///   users.restore          → {id}
-///   users.permanentDelete  → {id}
-///   users.updatePermissions→ {userId, departments, permissions}
-///   users.forceReset       → {userId}
+/// Aksiyonlar:
+///   LIST_USERS    → Super admin yetkisi gerekir
+///   CREATE_USER   → document: {name, email, password, departments, permissions}
 class TcpUserRepository implements UserRepository {
   final TcpSocketService _tcp;
-  final String? Function() _tokenProvider;
+  final Credentials? Function() _credentialsProvider;
 
-  TcpUserRepository(this._tcp, this._tokenProvider);
+  TcpUserRepository(this._tcp, this._credentialsProvider);
+
+  Credentials _getCreds() {
+    final c = _credentialsProvider();
+    if (c == null) {
+      throw const TcpException('Oturum açılmamış (kimlik bilgisi eksik).');
+    }
+    return c;
+  }
 
   @override
   Future<List<AppUser>> getUsers({bool includeDeleted = false}) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'users.list',
-      payload: {'includeDeleted': includeDeleted},
-      token: _tokenProvider(),
+      action: 'LIST_USERS',
+      username: c.username,
+      password: c.password,
     );
-    final list = (response['data'] as List<dynamic>).cast<Map<String, dynamic>>();
-    return list.map(_parseUser).toList();
+
+    final rawData = response['data'];
+    if (rawData == null || rawData is! List) {
+      return [];
+    }
+
+    return rawData.map((item) {
+      if (item is Map<String, dynamic>) return _parseUser(item);
+      if (item is Map) return _parseUser(Map<String, dynamic>.from(item));
+      return AppUser(
+        id: item.toString(),
+        name: item.toString(),
+        email: item.toString(),
+        role: UserRole.user,
+        departments: const {},
+        permissions: const {},
+        isActive: true,
+      );
+    }).toList();
   }
 
   @override
   Future<AppUser> getUserById(String id) async {
-    final response = await _tcp.send(
-      action: 'users.getById',
-      payload: {'id': id},
-      token: _tokenProvider(),
+    final users = await getUsers(includeDeleted: true);
+    return users.firstWhere(
+      (u) => u.id == id || u.email == id,
+      orElse: () => AppUser(
+        id: id,
+        name: id,
+        email: id,
+        role: UserRole.user,
+        departments: const {},
+        permissions: const {},
+        isActive: true,
+      ),
     );
-    return _parseUser(response['data'] as Map<String, dynamic>);
   }
 
   @override
@@ -50,54 +77,89 @@ class TcpUserRepository implements UserRepository {
     Set<String> departments = const {},
     Set<Permission> permissions = const {},
   }) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'users.create',
-      payload: {
+      action: 'CREATE_USER',
+      username: c.username,
+      password: c.password,
+      document: {
         'name': name,
         'email': email,
         'password': password,
         'departments': departments.toList(),
         'permissions': permissions.map((p) => p.name).toList(),
       },
-      token: _tokenProvider(),
     );
-    return _parseUser(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return _parseUser(first);
+      if (first is Map) return _parseUser(Map<String, dynamic>.from(first));
+    }
+
+    return AppUser(
+      id: email,
+      name: name,
+      email: email,
+      role: UserRole.user,
+      departments: departments,
+      permissions: permissions,
+      isActive: true,
+    );
   }
 
   @override
   Future<AppUser> updateUser(AppUser user) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'users.update',
-      payload: _serializeUser(user),
-      token: _tokenProvider(),
+      action: 'UPDATE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': user.id},
+      document: _serializeUser(user),
     );
-    return _parseUser(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return _parseUser(first);
+      if (first is Map) return _parseUser(Map<String, dynamic>.from(first));
+    }
+
+    return user;
   }
 
   @override
   Future<void> softDeleteUser(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'users.softDelete',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'DELETE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
     );
   }
 
   @override
   Future<void> restoreUser(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'users.restore',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'RESTORE_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
     );
   }
 
   @override
   Future<void> permanentlyDeleteUser(String id) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'users.permanentDelete',
-      payload: {'id': id},
-      token: _tokenProvider(),
+      action: 'DROP_USER',
+      username: c.username,
+      password: c.password,
+      filter: {'id': id},
     );
   }
 
@@ -107,24 +169,40 @@ class TcpUserRepository implements UserRepository {
     required Set<String> departments,
     required Set<Permission> permissions,
   }) async {
+    final c = _getCreds();
     final response = await _tcp.send(
-      action: 'users.updatePermissions',
-      payload: {
-        'userId': userId,
+      action: 'UPDATE_USER_PERMISSIONS',
+      username: c.username,
+      password: c.password,
+      filter: {'id': userId},
+      document: {
         'departments': departments.toList(),
         'permissions': permissions.map((p) => p.name).toList(),
       },
-      token: _tokenProvider(),
     );
-    return _parseUser(response['data'] as Map<String, dynamic>);
+
+    final rawData = response['data'];
+    if (rawData is List && rawData.isNotEmpty) {
+      final first = rawData.first;
+      if (first is Map<String, dynamic>) return _parseUser(first);
+      if (first is Map) return _parseUser(Map<String, dynamic>.from(first));
+    }
+
+    final existing = await getUserById(userId);
+    return existing.copyWith(
+      departments: departments,
+      permissions: permissions,
+    );
   }
 
   @override
   Future<void> forcePasswordReset(String userId) async {
+    final c = _getCreds();
     await _tcp.send(
-      action: 'users.forceReset',
-      payload: {'userId': userId},
-      token: _tokenProvider(),
+      action: 'RESET_USER_PASSWORD',
+      username: c.username,
+      password: c.password,
+      filter: {'id': userId},
     );
   }
 

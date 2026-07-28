@@ -4,21 +4,13 @@ part 'db_request.g.dart';
 
 /// Backend TCP/IP soket sunucusuna gönderilen istek veri modeli (DTO).
 ///
-/// Ön Yüz (Flutter) Protokolü:
-///   `{"requestId": "...", "action": "...", "token": "...", "payload": {...}}`
-///
-/// Arka Yüz (Java) Protokolü:
-///   `{"requestId": "...", "action": "...", "username": "...", "password": "...", ...}`
+/// Yeni Protokol Zarfı:
+///   `{"requestId": "...", "action": "...", "username": "...", "password": "...",
+///     "database": "...", "collection": "...", "filter": {...}, "document": {...}}`
 @JsonSerializable(includeIfNull: false)
 class DbRequest {
   final String requestId;
   final String action;
-
-  // Ön Yüz (Flutter) Protokol Alanları
-  final String? token;
-  final Map<String, dynamic>? payload;
-
-  // Arka Yüz (Java) Protokol Alanları
   final String? username;
   final String? password;
   final String? database;
@@ -29,8 +21,6 @@ class DbRequest {
   const DbRequest({
     required this.requestId,
     required this.action,
-    this.token,
-    this.payload,
     this.username,
     this.password,
     this.database,

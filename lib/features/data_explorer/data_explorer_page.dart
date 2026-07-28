@@ -14,6 +14,7 @@ import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
 import './controllers/data_explorer_notifier.dart';
 import '../../core/providers/repository_providers.dart';
+import '../../repositories/data_explorer/tcp_data_explorer_repository.dart';
 
 enum RecordFieldType { string, number, boolean, nullValue }
 
@@ -54,18 +55,10 @@ class _DataExplorerPageState
     _collectionsLoading = true;
 
     try {
-      final tcp = ref.read(socketServiceProvider);
-      final response = await tcp.send(
-        action: 'LIST_COLLECTIONS',
-        payload: {
-          'database': dbName,
-          'databaseId': dbId,
-        },
-      );
-      final rawData = response['data'];
-      if (rawData is List) {
-        final cols = rawData.map((e) => e.toString()).toList();
-        if (mounted) {
+      final repo = ref.read(dataExplorerRepositoryProvider);
+      if (repo is TcpDataExplorerRepository) {
+        final cols = await repo.getCollections(dbName);
+        if (mounted && cols.isNotEmpty) {
           setState(() {
             _serverCollections[dbId] = cols;
           });
@@ -2011,16 +2004,17 @@ class _DataExplorerPageState
         ref.read(selectedCollectionProvider.notifier).state = name;
 
         try {
-          final tcpRepo = ref.read(socketServiceProvider);
-          tcpRepo.send(
-            action: 'CREATE_COLLECTION',
-            payload: {
-              'database': currentDb.name,
-              'databaseId': currentDbId,
-              'collection': name,
-              'collectionName': name,
-            },
-          ).catchError((_) => <String, dynamic>{});
+          final creds = ref.read(credentialsProvider);
+          if (creds != null) {
+            final tcpRepo = ref.read(socketServiceProvider);
+            tcpRepo.send(
+              action: 'CREATE_COLLECTION',
+              username: creds.username,
+              password: creds.password,
+              database: currentDb.name,
+              collection: name,
+            ).catchError((_) => <String, dynamic>{});
+          }
         } catch (_) {}
 
         if (mounted) {
