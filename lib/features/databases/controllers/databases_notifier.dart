@@ -72,6 +72,9 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
 
   Future<void> softDelete(String id) async {
     await ref.read(databaseRepositoryProvider).softDeleteDatabase(id);
+    state = AsyncData(
+      (state.value ?? []).where((db) => db.id != id && db.name != id).toList(),
+    );
     await refresh(includeDeleted: _includeDeleted);
   }
 
@@ -83,8 +86,9 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
   Future<void> permanentlyDelete(String id) async {
     await ref.read(databaseRepositoryProvider).permanentlyDeleteDatabase(id);
     state = AsyncData(
-      (state.value ?? []).where((db) => db.id != id).toList(),
+      (state.value ?? []).where((db) => db.id != id && db.name != id).toList(),
     );
+    await refresh(includeDeleted: _includeDeleted);
   }
 }
 
