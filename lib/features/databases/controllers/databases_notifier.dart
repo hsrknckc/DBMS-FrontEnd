@@ -19,23 +19,29 @@ class DatabasesNotifier extends AsyncNotifier<List<DatabaseItem>> {
     final enrichedList = <DatabaseItem>[];
 
     for (final db in list) {
+      int colCount = db.collectionCount;
+      int recCount = db.recordCount;
+
       try {
         final cols = await explorerRepo.getCollections(db.name);
+        colCount = cols.length;
         int totalRecs = 0;
         for (final col in cols) {
-          final recs = await explorerRepo.getRecords(
-            databaseId: db.name,
-            collectionName: col,
-          );
-          totalRecs += recs.length;
+          try {
+            final recs = await explorerRepo.getRecords(
+              databaseId: db.name,
+              collectionName: col,
+            );
+            totalRecs += recs.length;
+          } catch (_) {}
         }
-        enrichedList.add(db.copyWith(
-          collectionCount: cols.length,
-          recordCount: totalRecs,
-        ));
-      } catch (_) {
-        enrichedList.add(db);
-      }
+        recCount = totalRecs;
+      } catch (_) {}
+
+      enrichedList.add(db.copyWith(
+        collectionCount: colCount,
+        recordCount: recCount,
+      ));
     }
 
     return enrichedList;

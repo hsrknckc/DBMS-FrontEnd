@@ -66,37 +66,39 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     final key = '${databaseId}_$collectionName';
     final c = _getCreds();
 
-    final response = await _tcp.send(
-      action: 'READ',
-      username: c.username,
-      password: c.password,
-      database: databaseId,
-      collection: collectionName,
-      filter: (searchQuery != null && searchQuery.isNotEmpty)
-          ? {'searchQuery': searchQuery}
-          : null,
-    );
+    try {
+      final response = await _tcp.send(
+        action: 'READ',
+        username: c.username,
+        password: c.password,
+        database: databaseId,
+        collection: collectionName,
+        filter: (searchQuery != null && searchQuery.isNotEmpty)
+            ? {'searchQuery': searchQuery}
+            : null,
+      );
 
-    final rawData = response['data'];
-    if (rawData is List) {
-      final fetched = rawData.map((doc) {
-        if (doc is Map<String, dynamic>) {
-          return DataRecord.fromJson(doc);
-        } else if (doc is Map) {
-          return DataRecord.fromJson(Map<String, dynamic>.from(doc));
-        }
-        return DataRecord(
-          id: doc.toString(),
-          databaseId: databaseId,
-          collectionName: collectionName,
-          data: {'value': doc},
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-      }).toList();
+      final rawData = response['data'];
+      if (rawData is List) {
+        final fetched = rawData.map((doc) {
+          if (doc is Map<String, dynamic>) {
+            return DataRecord.fromJson(doc);
+          } else if (doc is Map) {
+            return DataRecord.fromJson(Map<String, dynamic>.from(doc));
+          }
+          return DataRecord(
+            id: doc.toString(),
+            databaseId: databaseId,
+            collectionName: collectionName,
+            data: {'value': doc},
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+        }).toList();
 
-      _localRecords[key] = fetched;
-    }
+        _localRecords[key] = fetched;
+      }
+    } catch (_) {}
 
     final list = _localRecords[key] ?? [];
     if (searchQuery != null && searchQuery.isNotEmpty) {
