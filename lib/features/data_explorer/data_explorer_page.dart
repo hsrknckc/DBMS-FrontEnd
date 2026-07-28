@@ -13,6 +13,7 @@ import '../../models/data_record.dart';
 import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
 import './controllers/data_explorer_notifier.dart';
+import '../../core/providers/repository_providers.dart';
 
 enum RecordFieldType { string, number, boolean, nullValue }
 
@@ -43,22 +44,22 @@ class _DataExplorerPageState
   bool _showJsonView = false;
   bool _isImporting = false;
 
+  final Map<String, Set<String>> _extraCollections = {};
+
   List<_ExplorerDatabase> get _visibleDatabases {
     final dbAsync = ref.watch(databasesProvider);
     final serverDbs = dbAsync.valueOrNull ?? [];
 
-    final List<_ExplorerDatabase> sourceList = serverDbs.map((db) => _ExplorerDatabase(
-          id: db.id,
-          name: db.name,
-          department: db.department,
-          collections: const [
-            'sensor_readings',
-            'sensor_status',
-            'device_logs',
-            'signal_records',
-            'acoustic_samples',
-          ],
-        )).toList();
+    final List<_ExplorerDatabase> sourceList = serverDbs.map((db) {
+      final cols = (_extraCollections[db.id] ?? <String>{}).toList();
+
+      return _ExplorerDatabase(
+        id: db.id,
+        name: db.name,
+        department: db.department,
+        collections: cols,
+      );
+    }).toList();
 
     if (widget.currentUser.isSuperAdmin) {
       return sourceList;
@@ -1921,19 +1922,19 @@ class _DataExplorerPageState
 
   Future<void> _showAddCollectionDialog() async {
     final controller = TextEditingController();
-    final dbName = _selectedDatabase!.name;
-    final prefix = '${dbName}_';
+    final currentDb = _selectedDatabase;
+    if (currentDb == null) return;
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Yeni Collection Ekle'),
+          title: Text('${currentDb.name} veritabanına Yeni Collection Ekle'),
           content: TextField(
             controller: controller,
-            decoration: InputDecoration(
-              labelText: 'Collection Adı (Prefix Otomatik)', 
-              hintText: 'örn. test_koleksiyon',
-              prefixText: prefix,
+            decoration: const InputDecoration(
+              labelText: 'Collection Adı',
+              hintText: 'örn. ogrenciler',
             ),
           ),
           actions: [
@@ -1955,16 +1956,39 @@ class _DataExplorerPageState
     );
 
     if (confirm == true) {
-      final name = '$prefix${controller.text.trim()}';
-      setState(() {
-        _selectedDatabase!.collections.add(name);
-        _selectedCollection = name;
-        _lastSelectedCollection = name;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("'$name' koleksiyonu oluşturuldu."), backgroundColor: Colors.green),
-        );
+      final name = controller.text.trim();
+      final currentDbId = _selectedDatabaseId;
+
+      if (name.isNotEmpty && currentDbId != null) {
+        setState(() {
+          _extraCollections.putIfAbsent(currentDbId, () => <String>{}).add(name);
+          _selectedCollection = name;
+          _lastSelectedCollection = name;
+        });
+
+        ref.read(selectedCollectionProvider.notifier).state = name;
+
+        try {
+          final tcpRepo = ref.read(socketServiceProvider);
+          tcpRepo.send(
+            action: 'CREATE_COLLECTION',
+            payload: {
+              'database': currentDb.name,
+              'databaseId': currentDbId,
+              'collection': name,
+              'collectionName': name,
+            },
+          ).catchError((_) => <String, dynamic>{});
+        } catch (_) {}
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("'$name' koleksiyonu oluşturuldu."),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     }
   }
