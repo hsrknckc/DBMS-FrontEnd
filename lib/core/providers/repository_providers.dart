@@ -2,42 +2,26 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../repositories/auth/auth_repository.dart';
-// import '../../repositories/auth/mock_auth_repository.dart';
 import '../../repositories/auth/tcp_auth_repository.dart';
-// import '../../repositories/auth/http_auth_repository.dart'; // HTTP için
 
 import '../../repositories/user/user_repository.dart';
-// import '../../repositories/user/mock_user_repository.dart';
 import '../../repositories/user/tcp_user_repository.dart';
-// import '../../repositories/user/http_user_repository.dart';
 
 import '../../repositories/database/database_repository.dart';
-// import '../../repositories/database/mock_database_repository.dart';
 import '../../repositories/database/tcp_database_repository.dart';
-// import '../../repositories/database/http_database_repository.dart';
 
 import '../../repositories/data_explorer/data_explorer_repository.dart';
-// import '../../repositories/data_explorer/mock_data_explorer_repository.dart';
 import '../../repositories/data_explorer/tcp_data_explorer_repository.dart';
-// import '../../repositories/data_explorer/http_data_explorer_repository.dart';
 
 import '../../repositories/audit_log/audit_log_repository.dart';
-// import '../../repositories/audit_log/mock_audit_log_repository.dart';
 import '../../repositories/audit_log/tcp_audit_log_repository.dart';
-// import '../../repositories/audit_log/http_audit_log_repository.dart';
 
 import '../../repositories/dashboard/dashboard_repository.dart';
-// import '../../repositories/dashboard/mock_dashboard_repository.dart';
 import '../../repositories/dashboard/tcp_dashboard_repository.dart';
-// import '../../repositories/dashboard/http_dashboard_repository.dart';
 
 import 'socket_provider.dart';
 
 export 'socket_provider.dart';
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// HTTP Client (Dio) — HTTP katmanı için hazır, şimdilik yorum satırında.
-// ═══════════════════════════════════════════════════════════════════════════════
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
@@ -49,23 +33,10 @@ final dioProvider = Provider<Dio>((ref) {
   return dio;
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-
 final tcpSocketServiceProvider = socketServiceProvider;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║        ⚡ TEK GEÇİŞ NOKTASI — MOCK / TCP / HTTP                            ║
-// ║                                                                              ║
-// ║  Şu an: TCP  (Canlı AWS Sunucusu: 54.154.220.190:5150)                       ║
-// ║  MOCK'a geç: Yorum satırlarını değiştir → MockXxxRepository(...)          ║
-// ║  HTTP'ye geç: Yorum satırlarını değiştir → HttpXxxRepository(...)          ║
-// ╚══════════════════════════════════════════════════════════════════════════════╝
-// ═══════════════════════════════════════════════════════════════════════════════
 
 // ── Credentials (Giriş Bilgileri) ─────────────────────────────────────────────
 
-/// Giriş yapan kullanıcının kimliği — TCP isteklerinde kullanıcı adı (tam e-posta) ve şifre gönderilir
 class Credentials {
   final String username;
   final String password;
@@ -86,44 +57,49 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 // ── Kullanıcılar ─────────────────────────────────────────────────────────────
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
   return TcpUserRepository(
     ref.read(tcpSocketServiceProvider),
-    () => ref.read(credentialsProvider),
+    () => creds,
   );
 });
 
 // ── Database ─────────────────────────────────────────────────────────────────
 
 final databaseRepositoryProvider = Provider<DatabaseRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
   return TcpDatabaseRepository(
     ref.read(tcpSocketServiceProvider),
-    () => ref.read(credentialsProvider),
+    () => creds,
   );
 });
 
 // ── Data Explorer ─────────────────────────────────────────────────────────────
 
 final dataExplorerRepositoryProvider = Provider<DataExplorerRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
   return TcpDataExplorerRepository(
     ref.read(tcpSocketServiceProvider),
-    () => ref.read(credentialsProvider),
+    () => creds,
   );
 });
 
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 final auditLogRepositoryProvider = Provider<AuditLogRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
   return TcpAuditLogRepository(
     ref.read(tcpSocketServiceProvider),
-    () => ref.read(credentialsProvider),
+    () => creds,
   );
 });
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
   return TcpDashboardRepository(
     ref.read(tcpSocketServiceProvider),
-    () => ref.read(credentialsProvider),
+    () => creds,
   );
 });
