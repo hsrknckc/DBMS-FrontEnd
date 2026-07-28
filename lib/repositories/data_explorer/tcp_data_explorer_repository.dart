@@ -24,16 +24,36 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     String? searchQuery,
   }) async {
-    final response = await _tcp.send(
-      action: 'records.list',
-      payload: {
-        'databaseId': databaseId,
-        'collectionName': collectionName,
-        if (searchQuery != null && searchQuery.isNotEmpty)
-          'searchQuery': searchQuery,
-      },
-      token: _tokenProvider(),
-    );
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'READ',
+        payload: {
+          'database': databaseId,
+          'databaseId': databaseId,
+          'collection': collectionName,
+          'collectionName': collectionName,
+          'filter': searchQuery != null && searchQuery.isNotEmpty
+              ? {'searchQuery': searchQuery}
+              : {},
+        },
+        token: _tokenProvider(),
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.list',
+        payload: {
+          'database': databaseId,
+          'databaseId': databaseId,
+          'collection': collectionName,
+          'collectionName': collectionName,
+          if (searchQuery != null && searchQuery.isNotEmpty)
+            'searchQuery': searchQuery,
+        },
+        token: _tokenProvider(),
+      );
+    }
+
     final rawData = response['data'];
     if (rawData == null || rawData is! List) {
       return [];
@@ -58,31 +78,88 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     required String collectionName,
     required Map<String, dynamic> data,
   }) async {
-    final response = await _tcp.send(
-      action: 'records.create',
-      payload: {
-        'databaseId': databaseId,
-        'collectionName': collectionName,
-        'data': data,
-      },
-      token: _tokenProvider(),
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'WRITE',
+        payload: {
+          'database': databaseId,
+          'databaseId': databaseId,
+          'collection': collectionName,
+          'collectionName': collectionName,
+          'document': data,
+          'data': data,
+        },
+        token: _tokenProvider(),
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.create',
+        payload: {
+          'database': databaseId,
+          'databaseId': databaseId,
+          'collection': collectionName,
+          'collectionName': collectionName,
+          'document': data,
+          'data': data,
+        },
+        token: _tokenProvider(),
+      );
+    }
+
+    final resData = response['data'];
+    if (resData is Map<String, dynamic>) {
+      return DataRecord.fromJson(resData);
+    }
+    return DataRecord(
+      id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+      databaseId: databaseId,
+      collectionName: collectionName,
+      data: data,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
-    return DataRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
   @override
   Future<DataRecord> updateRecord(DataRecord record) async {
-    final response = await _tcp.send(
-      action: 'records.update',
-      payload: {
-        'id': record.id,
-        'databaseId': record.databaseId,
-        'collectionName': record.collectionName,
-        'data': record.data,
-      },
-      token: _tokenProvider(),
-    );
-    return DataRecord.fromJson(response['data'] as Map<String, dynamic>);
+    Map<String, dynamic> response;
+    try {
+      response = await _tcp.send(
+        action: 'UPDATE',
+        payload: {
+          'id': record.id,
+          'database': record.databaseId,
+          'databaseId': record.databaseId,
+          'collection': record.collectionName,
+          'collectionName': record.collectionName,
+          'filter': {'id': record.id},
+          'document': record.data,
+          'data': record.data,
+        },
+        token: _tokenProvider(),
+      );
+    } catch (_) {
+      response = await _tcp.send(
+        action: 'records.update',
+        payload: {
+          'id': record.id,
+          'database': record.databaseId,
+          'databaseId': record.databaseId,
+          'collection': record.collectionName,
+          'collectionName': record.collectionName,
+          'document': record.data,
+          'data': record.data,
+        },
+        token: _tokenProvider(),
+      );
+    }
+
+    final resData = response['data'];
+    if (resData is Map<String, dynamic>) {
+      return DataRecord.fromJson(resData);
+    }
+    return record;
   }
 
   @override
@@ -91,15 +168,32 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     String? databaseId,
     String? collectionName,
   }) async {
-    await _tcp.send(
-      action: 'records.delete',
-      payload: {
-        'id': id,
-        if (databaseId != null) 'databaseId': databaseId,
-        if (collectionName != null) 'collectionName': collectionName,
-      },
-      token: _tokenProvider(),
-    );
+    try {
+      await _tcp.send(
+        action: 'DELETE',
+        payload: {
+          'id': id,
+          'filter': {'id': id},
+          if (databaseId != null) 'database': databaseId,
+          if (databaseId != null) 'databaseId': databaseId,
+          if (collectionName != null) 'collection': collectionName,
+          if (collectionName != null) 'collectionName': collectionName,
+        },
+        token: _tokenProvider(),
+      );
+    } catch (_) {
+      await _tcp.send(
+        action: 'records.delete',
+        payload: {
+          'id': id,
+          if (databaseId != null) 'database': databaseId,
+          if (databaseId != null) 'databaseId': databaseId,
+          if (collectionName != null) 'collection': collectionName,
+          if (collectionName != null) 'collectionName': collectionName,
+        },
+        token: _tokenProvider(),
+      );
+    }
   }
 
   @override
