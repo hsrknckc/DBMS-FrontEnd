@@ -605,7 +605,16 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
   Future<void> _showSoftDeleteDialog(
     DatabaseItem database,
   ) async {
-    if (!_isSuperAdmin) {
+    final canDelete = widget.currentUser.isSuperAdmin ||
+        widget.currentUser.hasPermission(Permission.dataDelete);
+
+    if (!canDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veritabanı silme yetkiniz bulunmamaktadır.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
       return;
     }
 
@@ -613,9 +622,9 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Database silinsin mi?'),
+          title: const Text('Database Silinsin mi?'),
           content: Text(
-            '${database.name} silinen database bölümüne taşınacak.',
+            '${database.name} veritabanı sunucudan tamamen silinecektir.',
           ),
           actions: [
             TextButton(
@@ -645,18 +654,12 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
     }
 
     try {
-      await ref.read(databasesProvider.notifier).softDelete(database.id);
+      await ref.read(databasesProvider.notifier).permanentlyDelete(database.name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${database.name} silinenlere taşındı.',
-          ),
-          action: SnackBarAction(
-            label: 'Geri Al',
-            onPressed: () {
-              _restoreDatabase(database.id);
-            },
+            '${database.name} veritabanı silindi.',
           ),
         ),
       );
@@ -806,7 +809,7 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
     }
 
     try {
-      await ref.read(databasesProvider.notifier).permanentlyDelete(database.id);
+      await ref.read(databasesProvider.notifier).permanentlyDelete(database.name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${database.name} kalıcı olarak silindi.')),

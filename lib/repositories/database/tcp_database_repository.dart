@@ -24,46 +24,48 @@ class TcpDatabaseRepository implements DatabaseRepository {
   Future<List<DatabaseItem>> getDatabases({bool includeDeleted = false}) async {
     final c = _getCreds();
 
-    final response = await _tcp.send(
-      action: 'LIST_DATABASES_INFO',
-      username: c.username,
-      password: c.password,
-    );
+    try {
+      final response = await _tcp.send(
+        action: 'LIST_DATABASES_INFO',
+        username: c.username,
+        password: c.password,
+      );
 
-    final rawData = response['data'];
-    if (rawData is List) {
-      final fetched = rawData.map((item) {
-        if (item is String) {
+      final rawData = response['data'];
+      if (rawData is List) {
+        final fetched = rawData.map((item) {
+          if (item is String) {
+            return DatabaseItem(
+              id: item,
+              name: item,
+              department: 'General',
+              description: '$item veritabanı',
+              collectionCount: 0,
+              recordCount: 0,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+          } else if (item is Map<String, dynamic>) {
+            return _parseDb(item);
+          } else if (item is Map) {
+            return _parseDb(Map<String, dynamic>.from(item));
+          }
           return DatabaseItem(
-            id: item,
-            name: item,
+            id: item.toString(),
+            name: item.toString(),
             department: 'General',
-            description: '$item veritabanı',
+            description: '',
             collectionCount: 0,
             recordCount: 0,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           );
-        } else if (item is Map<String, dynamic>) {
-          return _parseDb(item);
-        } else if (item is Map) {
-          return _parseDb(Map<String, dynamic>.from(item));
-        }
-        return DatabaseItem(
-          id: item.toString(),
-          name: item.toString(),
-          department: 'General',
-          description: '',
-          collectionCount: 0,
-          recordCount: 0,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-      }).toList();
+        }).toList();
 
-      _localDbs.clear();
-      _localDbs.addAll(fetched);
-    }
+        _localDbs.clear();
+        _localDbs.addAll(fetched);
+      }
+    } catch (_) {}
 
     if (includeDeleted) {
       return _localDbs;
@@ -144,15 +146,7 @@ class TcpDatabaseRepository implements DatabaseRepository {
 
   @override
   Future<void> softDeleteDatabase(String id) async {
-    final c = _getCreds();
-    _localDbs.removeWhere((db) => db.id == id || db.name == id);
-
-    await _tcp.send(
-      action: 'DELETE_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: id,
-    );
+    await permanentlyDeleteDatabase(id);
   }
 
   @override
@@ -180,12 +174,27 @@ class TcpDatabaseRepository implements DatabaseRepository {
     final c = _getCreds();
     _localDbs.removeWhere((db) => db.id == id || db.name == id);
 
-    await _tcp.send(
-      action: 'DROP_DATABASE',
-      username: c.username,
-      password: c.password,
-      database: id,
-    );
+    try {
+      await _tcp.send(
+        action: 'DROP_DATABASE',
+        username: c.username,
+        password: c.password,
+        database: id,
+      );
+    } catch (e) {
+      try {
+        await _tcp.send(
+          action: 'DELETE_DATABASE',
+          username: c.username,
+          password: c.password,
+          database: id,
+        );
+      } catch (err) {
+        if (!err.toString().toLowerCase().contains('not found')) {
+          rethrow;
+        }
+      }
+    }
   }
 
   // ── Yardımcılar ─────────────────────────────────────────────────────────
