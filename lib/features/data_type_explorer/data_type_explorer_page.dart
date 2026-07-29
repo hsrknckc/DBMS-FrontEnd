@@ -12,6 +12,7 @@ import '../../models/data_record.dart';
 import '../../models/database_item.dart';
 import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
+import '../data_explorer/controllers/data_explorer_notifier.dart';
 
 class DataTypeExplorerPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
