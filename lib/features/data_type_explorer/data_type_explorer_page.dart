@@ -1105,23 +1105,21 @@ class _DataTypeExplorerPageState
 
       case 'String':
         if (val is List) {
-          return val.map((e) => e.toString().replaceAll(RegExp(r'^["\']|["\']$'), '')).join(', ');
+          return val.map((e) => _cleanQuotesAndBrackets(e.toString())).join(', ');
         }
         if (val is Map) {
           return jsonEncode(val);
         }
-        // Eğer string başında/sonunda [ ] parantezleri varsa temizle
+        // Eğer string başında/sonunda [ ] parantezleri veya tırnaklar varsa temizle
         if (strVal.startsWith('[') && strVal.endsWith(']')) {
-          final content = strVal.substring(1, strVal.length - 1).trim();
           try {
             final decoded = jsonDecode(strVal);
             if (decoded is List) {
-              return decoded.map((e) => e.toString()).join(', ');
+              return decoded.map((e) => _cleanQuotesAndBrackets(e.toString())).join(', ');
             }
           } catch (_) {}
-          return content.replaceAll(RegExp(r'^["\']|["\']$'), '');
         }
-        return strVal;
+        return _cleanQuotesAndBrackets(strVal);
 
       case 'DateTime':
         return strVal;
@@ -1148,6 +1146,17 @@ class _DataTypeExplorerPageState
       default:
         return val;
     }
+  }
+
+  String _cleanQuotesAndBrackets(String text) {
+    var t = text.trim();
+    if (t.startsWith('[') && t.endsWith(']')) {
+      t = t.substring(1, t.length - 1).trim();
+    }
+    if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+      t = t.substring(1, t.length - 1).trim();
+    }
+    return t;
   }
 
   // ════════════════════════════════════════════════════════════════════════
