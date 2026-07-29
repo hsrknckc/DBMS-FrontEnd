@@ -43,7 +43,10 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
   }
 
   /// Koleksiyonu Silme (DROP_COLLECTION)
-  Future<void> dropCollection(String databaseName, String collectionName) async {
+  Future<void> dropCollection(
+    String databaseName,
+    String collectionName,
+  ) async {
     final c = _getCreds();
     _localCollections[databaseName]?.remove(collectionName);
     _localRecords.remove('${databaseName}_$collectionName');
@@ -103,7 +106,9 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     final list = _localRecords[key] ?? [];
     if (searchQuery != null && searchQuery.isNotEmpty) {
       final queryLower = searchQuery.toLowerCase();
-      return list.where((r) => r.data.toString().toLowerCase().contains(queryLower)).toList();
+      return list
+          .where((r) => r.data.toString().toLowerCase().contains(queryLower))
+          .toList();
     }
     return list;
   }
@@ -122,7 +127,8 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
-      if (first is Map) return DataRecord.fromJson(Map<String, dynamic>.from(first));
+      if (first is Map)
+        return DataRecord.fromJson(Map<String, dynamic>.from(first));
     }
 
     throw TcpException('Kayıt bulunamadı: $id');
@@ -166,7 +172,10 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
       }
     } else {
       newRec = DataRecord(
-        id: data['_id']?.toString() ?? data['id']?.toString() ?? 'rec_${DateTime.now().millisecondsSinceEpoch}',
+        id:
+            data['_id']?.toString() ??
+            data['id']?.toString() ??
+            'rec_${DateTime.now().millisecondsSinceEpoch}',
         databaseId: databaseId,
         collectionName: collectionName,
         data: data,

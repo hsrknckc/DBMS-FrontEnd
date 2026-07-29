@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -16,28 +17,33 @@ import './controllers/data_explorer_notifier.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../repositories/data_explorer/tcp_data_explorer_repository.dart';
 
-enum RecordFieldType { string, number, boolean, nullValue }
+enum RecordFieldType {
+  string,
+  integer,
+  double,
+  boolean,
+  dateTime,
+  array,
+  object,
+  nullValue,
+}
 
 class DataExplorerPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
 
-  const DataExplorerPage({
-    super.key,
-    required this.currentUser,
-  });
+  const DataExplorerPage({super.key, required this.currentUser});
 
   @override
-  ConsumerState<DataExplorerPage> createState() =>
-      _DataExplorerPageState();
+  ConsumerState<DataExplorerPage> createState() => _DataExplorerPageState();
 }
 
-class _DataExplorerPageState
-    extends ConsumerState<DataExplorerPage> {
+class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
   static String? _lastSelectedDatabaseId;
   static String? _lastSelectedCollection;
 
-  final TextEditingController _searchController =
-      TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _tableHorizontalScrollController = ScrollController();
+  final ScrollController _tableVerticalScrollController = ScrollController();
 
   String? _selectedDatabaseId;
   String? _selectedCollection;
@@ -75,41 +81,57 @@ class _DataExplorerPageState
     final dbAsync = ref.watch(databasesProvider);
     final serverDbs = dbAsync.valueOrNull ?? [];
 
-    final List<_ExplorerDatabase> sourceList = serverDbs.map((db) {
-      final serverCols = _serverCollections[db.id] ?? [];
-      final extraCols = _extraCollections[db.id] ?? <String>{};
+    final seenKeys = <String>{};
+    final List<_ExplorerDatabase> sourceList = [];
+
+    for (final db in serverDbs) {
+      final dbKey = db.name.isNotEmpty ? db.name : db.id;
+      if (!seenKeys.add(dbKey)) continue;
+
+      final serverCols =
+          _serverCollections[dbKey] ?? _serverCollections[db.id] ?? [];
+      final extraCols =
+          _extraCollections[dbKey] ?? _extraCollections[db.id] ?? <String>{};
       final mergedCols = {...serverCols, ...extraCols}.toList();
 
-      return _ExplorerDatabase(
-        id: db.id,
-        name: db.name,
-        department: db.department,
-        collections: mergedCols,
+      sourceList.add(
+        _ExplorerDatabase(
+          id: dbKey,
+          name: db.name.isNotEmpty ? db.name : db.id,
+          department: db.department,
+          collections: mergedCols,
+        ),
       );
-    }).toList();
+    }
 
     if (widget.currentUser.isSuperAdmin) {
       return sourceList;
     }
 
-    return sourceList.map((database) {
-      if (!widget.currentUser.canAccessDepartment(database.department)) {
-        return null;
-      }
-      
-      final allowedCols = database.collections.where((col) {
-        return widget.currentUser.canAccessCollection(database.department, col);
-      }).toList();
-      
-      if (allowedCols.isEmpty) return null;
-      
-      return _ExplorerDatabase(
-        id: database.id,
-        name: database.name,
-        department: database.department,
-        collections: allowedCols,
-      );
-    }).whereType<_ExplorerDatabase>().toList();
+    return sourceList
+        .map((database) {
+          if (!widget.currentUser.canAccessDepartment(database.department)) {
+            return null;
+          }
+
+          final allowedCols = database.collections.where((col) {
+            return widget.currentUser.canAccessCollection(
+              database.department,
+              col,
+            );
+          }).toList();
+
+          if (allowedCols.isEmpty) return null;
+
+          return _ExplorerDatabase(
+            id: database.id,
+            name: database.name,
+            department: database.department,
+            collections: allowedCols,
+          );
+        })
+        .whereType<_ExplorerDatabase>()
+        .toList();
   }
 
   _ExplorerDatabase? get _selectedDatabase {
@@ -139,8 +161,7 @@ class _DataExplorerPageState
     final recordsAsync = ref.watch(dataExplorerProvider);
     final sourceRecords = recordsAsync.valueOrNull ?? [];
 
-    final query =
-        _searchController.text.trim().toLowerCase();
+    final query = _searchController.text.trim().toLowerCase();
 
     return sourceRecords.where((record) {
       if (query.isEmpty) {
@@ -149,9 +170,7 @@ class _DataExplorerPageState
 
       final searchableText = [
         record.id,
-        ...record.data.entries.map(
-          (entry) => '${entry.key} ${entry.value}',
-        ),
+        ...record.data.entries.map((entry) => '${entry.key} ${entry.value}'),
       ].join(' ').toLowerCase();
 
       return searchableText.contains(query);
@@ -160,37 +179,27 @@ class _DataExplorerPageState
 
   bool get _canView {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataView,
-        );
+        widget.currentUser.hasPermission(Permission.dataView);
   }
 
   bool get _canCreate {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataCreate,
-        );
+        widget.currentUser.hasPermission(Permission.dataCreate);
   }
 
   bool get _canUpdate {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataUpdate,
-        );
+        widget.currentUser.hasPermission(Permission.dataUpdate);
   }
 
   bool get _canDelete {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataDelete,
-        );
+        widget.currentUser.hasPermission(Permission.dataDelete);
   }
 
   bool get _canImport {
     return widget.currentUser.isSuperAdmin ||
-        widget.currentUser.hasPermission(
-          Permission.dataImport,
-        );
+        widget.currentUser.hasPermission(Permission.dataImport);
   }
 
   // Export yetkisi: tüm kullanıcılar dışa aktarabilir; _canExport
@@ -203,15 +212,16 @@ class _DataExplorerPageState
   }
 
   bool get _hasSelection {
-    return _selectedDatabaseId != null &&
-        _selectedCollection != null;
+    return _selectedDatabaseId != null && _selectedCollection != null;
   }
 
   @override
   void initState() {
     super.initState();
-    _selectedDatabaseId = ref.read(selectedDatabaseIdProvider) ?? _lastSelectedDatabaseId;
-    _selectedCollection = ref.read(selectedCollectionProvider) ?? _lastSelectedCollection;
+    _selectedDatabaseId =
+        ref.read(selectedDatabaseIdProvider) ?? _lastSelectedDatabaseId;
+    _selectedCollection =
+        ref.read(selectedCollectionProvider) ?? _lastSelectedCollection;
   }
 
   void _ensureSelection(List<_ExplorerDatabase> databases) {
@@ -221,15 +231,16 @@ class _DataExplorerPageState
     final currentRefCol = ref.read(selectedCollectionProvider);
 
     if (_selectedDatabaseId == null) {
-      if (currentRefDb != null && databases.any((db) => db.id == currentRefDb)) {
+      if (currentRefDb != null &&
+          databases.any((db) => db.id == currentRefDb)) {
         _selectedDatabaseId = currentRefDb;
       } else if (_lastSelectedDatabaseId != null &&
           databases.any((db) => db.id == _lastSelectedDatabaseId)) {
         _selectedDatabaseId = _lastSelectedDatabaseId;
-      } else {
-        _selectedDatabaseId = databases.first.id;
       }
     }
+
+    if (_selectedDatabaseId == null) return;
 
     final selectedDb = databases.firstWhere(
       (db) => db.id == _selectedDatabaseId,
@@ -247,10 +258,6 @@ class _DataExplorerPageState
       } else if (_lastSelectedCollection != null &&
           selectedDb.collections.contains(_lastSelectedCollection)) {
         _selectedCollection = _lastSelectedCollection;
-      } else if (selectedDb.collections.isNotEmpty) {
-        _selectedCollection = selectedDb.collections.first;
-      } else {
-        _selectedCollection = null;
       }
     }
 
@@ -273,6 +280,8 @@ class _DataExplorerPageState
   @override
   void dispose() {
     _searchController.dispose();
+    _tableHorizontalScrollController.dispose();
+    _tableVerticalScrollController.dispose();
     super.dispose();
   }
 
@@ -299,10 +308,10 @@ class _DataExplorerPageState
           child: !_hasSelection
               ? _buildNoSelection()
               : records.isEmpty
-                  ? _buildEmptyState()
-                  : _showJsonView
-                      ? _buildJsonView(records)
-                      : _buildTableView(records),
+              ? _buildEmptyState()
+              : _showJsonView
+              ? _buildJsonView(records)
+              : _buildTableView(records),
         ),
       ],
     );
@@ -318,14 +327,12 @@ class _DataExplorerPageState
           children: [
             Text(
               'Data Explorer',
-              style:
-                  Theme.of(context).textTheme.headlineLarge,
+              style: Theme.of(context).textTheme.headlineLarge,
             ),
             const SizedBox(height: 6),
             Text(
               'Database collection kayıtlarını görüntüleyin, içe aktarın ve yönetin.',
-              style:
-                  Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         );
@@ -336,26 +343,6 @@ class _DataExplorerPageState
         // görünür ama disabled + %50 opaklık + Tooltip ile uyarı verir.
         const noWriteTooltip =
             'Bu işlem için yazma yetkiniz bulunmamaktadır.\nYöneticinizle iletişime geçin.';
-
-        Widget importBtn = Opacity(
-          opacity: _canImport ? 1.0 : 0.5,
-          child: Tooltip(
-            message: _canImport ? '' : noWriteTooltip,
-            child: OutlinedButton.icon(
-              onPressed: _canImport && _hasSelection && !_isImporting
-                  ? _pickAndImportJson
-                  : null,
-              icon: _isImporting
-                  ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.upload_file_outlined),
-              label: Text(_isImporting ? 'Dosya okunuyor' : 'JSON İçe Aktar'),
-            ),
-          ),
-        );
 
         Widget createBtn = Opacity(
           opacity: _canCreate ? 1.0 : 0.5,
@@ -374,17 +361,13 @@ class _DataExplorerPageState
         final actions = Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: [importBtn, createBtn],
+          children: [createBtn],
         );
 
         if (isNarrow) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              titleSection,
-              const SizedBox(height: 14),
-              actions,
-            ],
+            children: [titleSection, const SizedBox(height: 14), actions],
           );
         }
 
@@ -406,9 +389,7 @@ class _DataExplorerPageState
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -417,21 +398,21 @@ class _DataExplorerPageState
           return Wrap(
             spacing: 14,
             runSpacing: 14,
-            crossAxisAlignment:
-                WrapCrossAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               SizedBox(
-                width: isNarrow
-                    ? constraints.maxWidth
-                    : 300,
-                child:
-                    DropdownButtonFormField<String>(
-                  value: _selectedDatabaseId,
+                width: isNarrow ? constraints.maxWidth : 300,
+                child: DropdownButtonFormField<String>(
+                  value:
+                      _visibleDatabases.any(
+                        (db) => db.id == _selectedDatabaseId,
+                      )
+                      ? _selectedDatabaseId
+                      : null,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Database',
-                    prefixIcon:
-                        Icon(Icons.storage_outlined),
+                    prefixIcon: Icon(Icons.storage_outlined),
                   ),
                   items: _visibleDatabases.map((database) {
                     return DropdownMenuItem<String>(
@@ -447,18 +428,15 @@ class _DataExplorerPageState
                       return;
                     }
 
-                    final database =
-                        _visibleDatabases.firstWhere(
+                    final database = _visibleDatabases.firstWhere(
                       (item) => item.id == value,
                     );
 
                     setState(() {
                       _selectedDatabaseId = value;
-                      _selectedCollection =
-                          database.collections.isEmpty
-                              ? null
-                              : database
-                                  .collections.first;
+                      _selectedCollection = database.collections.isEmpty
+                          ? null
+                          : database.collections.first;
                       _searchController.clear();
                       _lastSelectedDatabaseId = _selectedDatabaseId;
                       _lastSelectedCollection = _selectedCollection;
@@ -479,13 +457,21 @@ class _DataExplorerPageState
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedCollection,
+                        value:
+                            (_selectedDatabase?.collections.contains(
+                                  _selectedCollection,
+                                ) ??
+                                false)
+                            ? _selectedCollection
+                            : null,
                         isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Collection',
                           prefixIcon: Icon(Icons.folder_outlined),
                         ),
-                        items: (_selectedDatabase?.collections ?? []).map((collection) {
+                        items: (_selectedDatabase?.collections ?? []).map((
+                          collection,
+                        ) {
                           return DropdownMenuItem<String>(
                             value: collection,
                             child: Text(
@@ -517,14 +503,22 @@ class _DataExplorerPageState
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.3),
+                              ),
                             ),
-                            child: const Icon(Icons.add, color: AppColors.primary, size: 20),
+                            child: const Icon(
+                              Icons.add,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
                     ],
-                    if (_canDelete && _selectedDatabase != null && _selectedCollection != null) ...[
+                    if (_canDelete &&
+                        _selectedDatabase != null &&
+                        _selectedCollection != null) ...[
                       const SizedBox(width: 8),
                       Tooltip(
                         message: 'Seçili Collection\'ı Sil',
@@ -536,9 +530,15 @@ class _DataExplorerPageState
                             decoration: BoxDecoration(
                               color: AppColors.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: AppColors.danger.withValues(alpha: 0.3),
+                              ),
                             ),
-                            child: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
+                            child: const Icon(
+                              Icons.delete_outline,
+                              color: AppColors.danger,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
@@ -549,8 +549,7 @@ class _DataExplorerPageState
               if (_selectedDatabase != null)
                 _InfoBadge(
                   icon: Icons.apartment_outlined,
-                  text:
-                      _selectedDatabase!.department,
+                  text: _selectedDatabase!.department,
                 ),
             ],
           );
@@ -566,18 +565,14 @@ class _DataExplorerPageState
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 900;
 
           final searchField = SizedBox(
-            width: isNarrow
-                ? constraints.maxWidth
-                : 320,
+            width: isNarrow ? constraints.maxWidth : 320,
             child: TextField(
               controller: _searchController,
               onChanged: (_) {
@@ -593,15 +588,13 @@ class _DataExplorerPageState
           final controls = Wrap(
             spacing: 10,
             runSpacing: 10,
-            crossAxisAlignment:
-                WrapCrossAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               SegmentedButton<bool>(
                 segments: const [
                   ButtonSegment<bool>(
                     value: false,
-                    icon:
-                        Icon(Icons.table_rows_outlined),
+                    icon: Icon(Icons.table_rows_outlined),
                     label: Text('Tablo'),
                   ),
                   ButtonSegment<bool>(
@@ -666,29 +659,17 @@ class _DataExplorerPageState
           if (isNarrow) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                searchField,
-                const SizedBox(height: 12),
-                controls,
-              ],
+              children: [searchField, const SizedBox(height: 12), controls],
             );
           }
 
-          return Row(
-            children: [
-              searchField,
-              const Spacer(),
-              controls,
-            ],
-          );
+          return Row(children: [searchField, const Spacer(), controls]);
         },
       ),
     );
   }
 
-  Widget _buildTableView(
-    List<DataRecord> records,
-  ) {
+  Widget _buildTableView(List<DataRecord> records) {
     final columns = _findColumns(records);
 
     return Container(
@@ -696,47 +677,50 @@ class _DataExplorerPageState
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Scrollbar(
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+            },
+          ),
+          child: Scrollbar(
+            controller: _tableHorizontalScrollController,
+            thumbVisibility: true,
+            trackVisibility: true,
             child: SingleChildScrollView(
-              child: DataTable(
-                headingRowColor:
-                    const WidgetStatePropertyAll(
+              controller: _tableHorizontalScrollController,
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                controller: _tableVerticalScrollController,
+                child: DataTable(
+                headingRowColor: const WidgetStatePropertyAll(
                   AppColors.background,
                 ),
                 columns: [
                   const DataColumn(
                     label: Text(
                       'ID',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   ...columns.map((column) {
                     return DataColumn(
                       label: Text(
                         column,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     );
                   }),
                   const DataColumn(
                     label: Text(
                       'İşlemler',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -748,8 +732,7 @@ class _DataExplorerPageState
                           width: 150,
                           child: Text(
                             record.id,
-                            overflow:
-                                TextOverflow.ellipsis,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -758,11 +741,8 @@ class _DataExplorerPageState
                           SizedBox(
                             width: 150,
                             child: Text(
-                              _displayValue(
-                                record.data[column],
-                              ),
-                              overflow:
-                                  TextOverflow.ellipsis,
+                              _displayValue(record.data[column]),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         );
@@ -781,9 +761,7 @@ class _DataExplorerPageState
                                   readOnly: !_canUpdate,
                                 );
                               },
-                              icon: const Icon(
-                                Icons.visibility_outlined,
-                              ),
+                              icon: const Icon(Icons.visibility_outlined),
                             ),
                             Opacity(
                               opacity: _canUpdate ? 1.0 : 0.5,
@@ -827,20 +805,17 @@ class _DataExplorerPageState
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildJsonView(
-    List<DataRecord> records,
-  ) {
+  Widget _buildJsonView(List<DataRecord> records) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -853,23 +828,17 @@ class _DataExplorerPageState
 
           final jsonText = const JsonEncoder.withIndent(
             '  ',
-          ).convert({
-            '_id': record.id,
-            ...record.data,
-          });
+          ).convert({'_id': record.id, ...record.data});
 
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.border,
-              ),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -887,9 +856,7 @@ class _DataExplorerPageState
                       onPressed: () {
                         _showRecordDetails(record);
                       },
-                      icon: const Icon(
-                        Icons.visibility_outlined,
-                      ),
+                      icon: const Icon(Icons.visibility_outlined),
                     ),
                     Opacity(
                       opacity: _canUpdate ? 1.0 : 0.5,
@@ -952,8 +919,7 @@ class _DataExplorerPageState
     });
 
     try {
-      final result =
-          await FilePicker.pickFiles(
+      final result = await FilePicker.pickFiles(
         dialogTitle: 'MongoDB JSON dosyasını seçin',
         type: FileType.custom,
         allowedExtensions: ['json'],
@@ -969,21 +935,16 @@ class _DataExplorerPageState
       final bytes = selectedFile.bytes;
 
       if (bytes == null) {
-        _showErrorMessage(
-          'Dosya içeriği okunamadı.',
-        );
+        _showErrorMessage('Dosya içeriği okunamadı.');
         return;
       }
 
       final jsonText = _decodeJsonBytes(bytes);
 
-      final importedDocuments =
-          _parseImportedDocuments(jsonText);
+      final importedDocuments = _parseImportedDocuments(jsonText);
 
       if (importedDocuments.isEmpty) {
-        _showErrorMessage(
-          'Dosyada içe aktarılabilecek kayıt bulunamadı.',
-        );
+        _showErrorMessage('Dosyada içe aktarılabilecek kayıt bulunamadı.');
         return;
       }
 
@@ -991,8 +952,7 @@ class _DataExplorerPageState
         return;
       }
 
-      final shouldImport =
-          await _showImportPreviewDialog(
+      final shouldImport = await _showImportPreviewDialog(
         fileName: selectedFile.name,
         documents: importedDocuments,
       );
@@ -1005,9 +965,7 @@ class _DataExplorerPageState
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${importedDocuments.length} kayıt içe aktarıldı.',
-          ),
+          content: Text('${importedDocuments.length} kayıt içe aktarıldı.'),
         ),
       );
     } on FormatException catch (error) {
@@ -1029,20 +987,15 @@ class _DataExplorerPageState
     try {
       return utf8.decode(bytes);
     } on FormatException {
-      throw const FormatException(
-        'Dosya UTF-8 formatında okunamadı.',
-      );
+      throw const FormatException('Dosya UTF-8 formatında okunamadı.');
     }
   }
 
-  List<Map<String, dynamic>>
-      _parseImportedDocuments(String jsonText) {
+  List<Map<String, dynamic>> _parseImportedDocuments(String jsonText) {
     final trimmedText = jsonText.trim();
 
     if (trimmedText.isEmpty) {
-      throw const FormatException(
-        'Seçilen JSON dosyası boş.',
-      );
+      throw const FormatException('Seçilen JSON dosyası boş.');
     }
 
     dynamic decoded;
@@ -1054,28 +1007,20 @@ class _DataExplorerPageState
     }
 
     if (decoded is Map) {
-      return [
-        Map<String, dynamic>.from(decoded),
-      ];
+      return [Map<String, dynamic>.from(decoded)];
     }
 
     if (decoded is List) {
       final documents = <Map<String, dynamic>>[];
 
-      for (var index = 0;
-          index < decoded.length;
-          index++) {
+      for (var index = 0; index < decoded.length; index++) {
         final item = decoded[index];
 
         if (item is! Map) {
-          throw FormatException(
-            '${index + 1}. kayıt bir JSON nesnesi değil.',
-          );
+          throw FormatException('${index + 1}. kayıt bir JSON nesnesi değil.');
         }
 
-        documents.add(
-          Map<String, dynamic>.from(item),
-        );
+        documents.add(Map<String, dynamic>.from(item));
       }
 
       return documents;
@@ -1086,44 +1031,32 @@ class _DataExplorerPageState
     );
   }
 
-  List<Map<String, dynamic>> _parseJsonLines(
-    String jsonText,
-  ) {
+  List<Map<String, dynamic>> _parseJsonLines(String jsonText) {
     final lines = const LineSplitter()
         .convert(jsonText)
         .where((line) => line.trim().isNotEmpty)
         .toList();
 
     if (lines.isEmpty) {
-      throw const FormatException(
-        'JSON dosyasında kayıt bulunamadı.',
-      );
+      throw const FormatException('JSON dosyasında kayıt bulunamadı.');
     }
 
     final documents = <Map<String, dynamic>>[];
 
-    for (var index = 0;
-        index < lines.length;
-        index++) {
+    for (var index = 0; index < lines.length; index++) {
       dynamic decodedLine;
 
       try {
         decodedLine = jsonDecode(lines[index]);
       } on FormatException {
-        throw FormatException(
-          '${index + 1}. satır geçerli JSON değil.',
-        );
+        throw FormatException('${index + 1}. satır geçerli JSON değil.');
       }
 
       if (decodedLine is! Map) {
-        throw FormatException(
-          '${index + 1}. satır bir JSON nesnesi değil.',
-        );
+        throw FormatException('${index + 1}. satır bir JSON nesnesi değil.');
       }
 
-      documents.add(
-        Map<String, dynamic>.from(decodedLine),
-      );
+      documents.add(Map<String, dynamic>.from(decodedLine));
     }
 
     return documents;
@@ -1133,39 +1066,27 @@ class _DataExplorerPageState
     required String fileName,
     required List<Map<String, dynamic>> documents,
   }) {
-    final previewDocuments =
-        documents.take(3).toList();
+    final previewDocuments = documents.take(3).toList();
 
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
-            'JSON içe aktarma önizlemesi',
-          ),
+          title: const Text('JSON içe aktarma önizlemesi'),
           content: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 700,
-              maxHeight: 620,
-            ),
+            constraints: const BoxConstraints(maxWidth: 700, maxHeight: 620),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ImportInformationRow(
-                  label: 'Dosya',
-                  value: fileName,
-                ),
+                _ImportInformationRow(label: 'Dosya', value: fileName),
                 _ImportInformationRow(
                   label: 'Database',
-                  value:
-                      _selectedDatabase?.name ?? '-',
+                  value: _selectedDatabase?.name ?? '-',
                 ),
                 _ImportInformationRow(
                   label: 'Collection',
-                  value:
-                      _selectedCollection ?? '-',
+                  value: _selectedCollection ?? '-',
                 ),
                 _ImportInformationRow(
                   label: 'Kayıt sayısı',
@@ -1184,30 +1105,22 @@ class _DataExplorerPageState
                 Flexible(
                   child: ListView.separated(
                     shrinkWrap: true,
-                    itemCount:
-                        previewDocuments.length,
+                    itemCount: previewDocuments.length,
                     separatorBuilder: (_, __) {
                       return const SizedBox(height: 10);
                     },
                     itemBuilder: (context, index) {
-                      final jsonText =
-                          const JsonEncoder.withIndent(
+                      final jsonText = const JsonEncoder.withIndent(
                         '  ',
-                      ).convert(
-                        previewDocuments[index],
-                      );
+                      ).convert(previewDocuments[index]);
 
                       return Container(
                         width: double.infinity,
-                        padding:
-                            const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppColors.background,
-                          borderRadius:
-                              BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppColors.border,
-                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
                         ),
                         child: SelectableText(
                           jsonText,
@@ -1245,11 +1158,8 @@ class _DataExplorerPageState
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
-              icon:
-                  const Icon(Icons.upload_outlined),
-              label: Text(
-                '${documents.length} Kaydı Aktar',
-              ),
+              icon: const Icon(Icons.upload_outlined),
+              label: Text('${documents.length} Kaydı Aktar'),
             ),
           ],
         );
@@ -1257,39 +1167,27 @@ class _DataExplorerPageState
     );
   }
 
-  Future<void> _importDocuments(
-    List<Map<String, dynamic>> documents,
-  ) async {
+  Future<void> _importDocuments(List<Map<String, dynamic>> documents) async {
     final databaseId = _selectedDatabaseId;
     final collectionName = _selectedCollection;
 
-    if (databaseId == null ||
-        collectionName == null) {
+    if (databaseId == null || collectionName == null) {
       return;
     }
 
     final now = DateTime.now();
     final importedRecords = <DataRecord>[];
 
-    for (var index = 0;
-        index < documents.length;
-        index++) {
-      final originalDocument =
-          Map<String, dynamic>.from(
-        documents[index],
-      );
+    for (var index = 0; index < documents.length; index++) {
+      final originalDocument = Map<String, dynamic>.from(documents[index]);
 
-      final extractedId =
-          _extractMongoDocumentId(
-        originalDocument['_id'],
-      );
+      final extractedId = _extractMongoDocumentId(originalDocument['_id']);
 
       originalDocument.remove('_id');
 
       importedRecords.add(
         DataRecord(
-          id: extractedId ??
-              'import-${now.millisecondsSinceEpoch}-$index',
+          id: extractedId ?? 'import-${now.millisecondsSinceEpoch}-$index',
           databaseId: databaseId,
           collectionName: collectionName,
           data: originalDocument,
@@ -1305,14 +1203,16 @@ class _DataExplorerPageState
         await ref.read(dataExplorerProvider.notifier).importRecords(dataList);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${importedRecords.length} kayıt içe aktarıldı.')),
+            SnackBar(
+              content: Text('${importedRecords.length} kayıt içe aktarıldı.'),
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('İçe aktarma hatası: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('İçe aktarma hatası: $e')));
         }
       }
     }
@@ -1323,14 +1223,12 @@ class _DataExplorerPageState
       return null;
     }
 
-    if (idValue is String ||
-        idValue is num) {
+    if (idValue is String || idValue is num) {
       return idValue.toString();
     }
 
     if (idValue is Map) {
-      final objectId =
-          idValue[r'$oid'];
+      final objectId = idValue[r'$oid'];
 
       if (objectId != null) {
         return objectId.toString();
@@ -1347,7 +1245,7 @@ class _DataExplorerPageState
     for (var r in _filteredRecords) {
       existingKeys.addAll(r.data.keys);
     }
-    
+
     final initialData = <String, dynamic>{};
     for (var key in existingKeys) {
       initialData[key] = '';
@@ -1375,16 +1273,14 @@ class _DataExplorerPageState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
       }
     }
   }
 
-  Future<void> _showEditRecordDialog(
-    DataRecord record,
-  ) async {
+  Future<void> _showEditRecordDialog(DataRecord record) async {
     final result = await _showRecordEditorDialog(
       title: 'Kaydı Düzenle',
       initialData: record.data,
@@ -1402,15 +1298,15 @@ class _DataExplorerPageState
       );
       await ref.read(dataExplorerProvider.notifier).updateRecord(updatedRecord);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kayıt güncellendi.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Kayıt güncellendi.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
       }
     }
   }
@@ -1425,77 +1321,106 @@ class _DataExplorerPageState
       builder: (dialogContext) {
         String? errorMessage;
         bool isJsonMode = false;
-        
+
         final formData = Map<String, dynamic>.from(initialData);
         final controllers = <String, TextEditingController>{};
         final types = <String, RecordFieldType>{};
-        
+
         void initField(String key, dynamic val) {
-           if (val == null) {
-              types[key] = RecordFieldType.nullValue;
-              controllers[key] = TextEditingController(text: 'null');
-           } else if (val is bool) {
-              types[key] = RecordFieldType.boolean;
-              controllers[key] = TextEditingController(text: val.toString());
-           } else if (val is num) {
-              types[key] = RecordFieldType.number;
-              controllers[key] = TextEditingController(text: val.toString());
-           } else if (val is Map || val is List) {
-              types[key] = RecordFieldType.string;
-              controllers[key] = TextEditingController(text: jsonEncode(val));
-           } else {
-              types[key] = RecordFieldType.string;
-              controllers[key] = TextEditingController(text: val.toString());
-           }
+          if (val == null) {
+            types[key] = RecordFieldType.nullValue;
+            controllers[key] = TextEditingController(text: 'null');
+          } else if (val is bool) {
+            types[key] = RecordFieldType.boolean;
+            controllers[key] = TextEditingController(text: val.toString());
+          } else if (val is int) {
+            types[key] = RecordFieldType.integer;
+            controllers[key] = TextEditingController(text: val.toString());
+          } else if (val is double) {
+            types[key] = RecordFieldType.double;
+            controllers[key] = TextEditingController(text: val.toString());
+          } else if (val is num) {
+            types[key] = RecordFieldType.integer;
+            controllers[key] = TextEditingController(text: val.toString());
+          } else if (val is List) {
+            types[key] = RecordFieldType.array;
+            controllers[key] = TextEditingController(text: jsonEncode(val));
+          } else if (val is Map) {
+            types[key] = RecordFieldType.object;
+            controllers[key] = TextEditingController(text: jsonEncode(val));
+          } else if (val != null &&
+              DateTime.tryParse(val.toString()) != null &&
+              val.toString().contains('-') &&
+              val.toString().length >= 10) {
+            types[key] = RecordFieldType.dateTime;
+            controllers[key] = TextEditingController(text: val.toString());
+          } else {
+            types[key] = RecordFieldType.string;
+            controllers[key] = TextEditingController(text: val.toString());
+          }
         }
 
         for (var key in formData.keys) {
           initField(key, formData[key]);
         }
-        
+
         final jsonController = TextEditingController(
           text: const JsonEncoder.withIndent(' ').convert(formData),
         );
-        
+
         final newKeyController = TextEditingController();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            
             void syncToJson() {
               for (var key in controllers.keys) {
                 final type = types[key]!;
                 final text = controllers[key]!.text.trim();
-                
+
                 if (type == RecordFieldType.nullValue) {
                   formData[key] = null;
                 } else if (type == RecordFieldType.boolean) {
                   formData[key] = (text == 'true');
-                } else if (type == RecordFieldType.number) {
-                  formData[key] = num.tryParse(text) ?? 0;
+                } else if (type == RecordFieldType.integer) {
+                  formData[key] =
+                      int.tryParse(text) ?? num.tryParse(text)?.toInt() ?? 0;
+                } else if (type == RecordFieldType.double) {
+                  formData[key] = double.tryParse(text) ?? 0.0;
+                } else if (type == RecordFieldType.dateTime) {
+                  formData[key] = text;
+                } else if (type == RecordFieldType.array ||
+                    type == RecordFieldType.object) {
+                  try {
+                    formData[key] = jsonDecode(text);
+                  } catch (_) {
+                    formData[key] = text;
+                  }
                 } else {
                   formData[key] = text;
                 }
               }
-              jsonController.text = const JsonEncoder.withIndent(' ').convert(formData);
+              jsonController.text = const JsonEncoder.withIndent(
+                ' ',
+              ).convert(formData);
             }
-            
+
             void syncToForm() {
-               try {
-                  final decoded = jsonDecode(jsonController.text);
-                  if (decoded is! Map<String, dynamic>) throw const FormatException();
-                  
-                  formData.clear();
-                  formData.addAll(decoded);
-                  controllers.clear();
-                  types.clear();
-                  for (var key in formData.keys) {
-                    initField(key, formData[key]);
-                  }
-                  errorMessage = null;
-               } catch (e) {
-                  errorMessage = 'Geçersiz JSON formatı';
-               }
+              try {
+                final decoded = jsonDecode(jsonController.text);
+                if (decoded is! Map<String, dynamic>)
+                  throw const FormatException();
+
+                formData.clear();
+                formData.addAll(decoded);
+                controllers.clear();
+                types.clear();
+                for (var key in formData.keys) {
+                  initField(key, formData[key]);
+                }
+                errorMessage = null;
+              } catch (e) {
+                errorMessage = 'Geçersiz JSON formatı';
+              }
             }
 
             return AlertDialog(
@@ -1505,8 +1430,16 @@ class _DataExplorerPageState
                   Text(title),
                   SegmentedButton<bool>(
                     segments: const [
-                      ButtonSegment(value: false, icon: Icon(Icons.list), label: Text('Form')),
-                      ButtonSegment(value: true, icon: Icon(Icons.data_object), label: Text('JSON')),
+                      ButtonSegment(
+                        value: false,
+                        icon: Icon(Icons.list),
+                        label: Text('Form'),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.data_object),
+                        label: Text('JSON'),
+                      ),
                     ],
                     selected: {isJsonMode},
                     onSelectionChanged: (val) {
@@ -1524,140 +1457,271 @@ class _DataExplorerPageState
                 ],
               ),
               content: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620, maxHeight: 550),
-                child: isJsonMode 
-                  ? TextField(
-                      controller: jsonController,
-                      minLines: 15,
-                      maxLines: 20,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                      decoration: InputDecoration(
-                        labelText: 'JSON',
-                        alignLabelWithHint: true,
-                        errorText: errorMessage,
-                        border: const OutlineInputBorder(),
-                      ),
-                    )
-                  : SizedBox(
-                      width: double.maxFinite,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: controllers.isEmpty 
-                              ? const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Center(child: Text('Gösterilecek alan yok (Koleksiyon boş)')),
-                                )
-                              : ListView(
-                                  shrinkWrap: true,
-                                  children: controllers.entries.map((e) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12.0),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          flex: 2, 
-                                          child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        DropdownButton<RecordFieldType>(
-                                           value: types[e.key],
-                                           isDense: true,
-                                           underline: const SizedBox(),
-                                           onChanged: (val) {
-                                              if (val != null) {
-                                                 setDialogState(() {
-                                                    types[e.key] = val;
-                                                    if (val == RecordFieldType.boolean) {
-                                                      e.value.text = 'true';
-                                                    } else if (val == RecordFieldType.nullValue) {
-                                                      e.value.text = 'null';
-                                                    }
-                                                 });
-                                              }
-                                           },
-                                           items: const [
-                                              DropdownMenuItem(value: RecordFieldType.string, child: Text('String', style: TextStyle(fontSize: 13))),
-                                              DropdownMenuItem(value: RecordFieldType.number, child: Text('Number', style: TextStyle(fontSize: 13))),
-                                              DropdownMenuItem(value: RecordFieldType.boolean, child: Text('Boolean', style: TextStyle(fontSize: 13))),
-                                              DropdownMenuItem(value: RecordFieldType.nullValue, child: Text('Null', style: TextStyle(fontSize: 13))),
-                                           ],
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          flex: 3,
-                                          child: types[e.key] == RecordFieldType.boolean
-                                              ? DropdownButtonFormField<String>(
-                                                  value: (e.value.text == 'true' || e.value.text == 'false') ? e.value.text : 'true',
-                                                  decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                                                  items: const [
-                                                    DropdownMenuItem(value: 'true', child: Text('True')),
-                                                    DropdownMenuItem(value: 'false', child: Text('False')),
-                                                  ],
-                                                  onChanged: (val) {
-                                                    if (val != null) e.value.text = val;
-                                                  }
-                                                )
-                                              : TextField(
-                                                  controller: e.value,
-                                                  enabled: types[e.key] != RecordFieldType.nullValue,
-                                                  decoration: const InputDecoration(
-                                                    isDense: true,
-                                                    border: OutlineInputBorder(),
-                                                  )
-                                                )
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                          onPressed: () {
-                                            setDialogState(() {
-                                              controllers.remove(e.key);
-                                              types.remove(e.key);
-                                              formData.remove(e.key);
-                                            });
-                                          }
-                                        )
-                                      ],
-                                    )
-                                  );
-                                }).toList(),
-                              )
+                constraints: const BoxConstraints(
+                  maxWidth: 620,
+                  maxHeight: 550,
+                ),
+                child: isJsonMode
+                    ? TextField(
+                        controller: jsonController,
+                        minLines: 15,
+                        maxLines: 20,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13,
                         ),
-                        const Divider(),
-                        Row(
+                        decoration: InputDecoration(
+                          labelText: 'JSON',
+                          alignLabelWithHint: true,
+                          errorText: errorMessage,
+                          border: const OutlineInputBorder(),
+                        ),
+                      )
+                    : SizedBox(
+                        width: double.maxFinite,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: newKeyController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Yeni Alan (Key)',
-                                  isDense: true,
-                                  border: OutlineInputBorder(),
-                                )
-                              )
+                            Flexible(
+                              child: controllers.isEmpty
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: Center(
+                                        child: Text(
+                                          'Gösterilecek alan yok (Koleksiyon boş)',
+                                        ),
+                                      ),
+                                    )
+                                  : ListView(
+                                      shrinkWrap: true,
+                                      children: controllers.entries.map((e) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 12.0,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 2,
+                                                child: Text(
+                                                  e.key,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              DropdownButton<RecordFieldType>(
+                                                value: types[e.key],
+                                                isDense: true,
+                                                underline: const SizedBox(),
+                                                onChanged: (val) {
+                                                  if (val != null) {
+                                                    setDialogState(() {
+                                                      types[e.key] = val;
+                                                      if (val ==
+                                                          RecordFieldType
+                                                              .boolean) {
+                                                        e.value.text = 'true';
+                                                      } else if (val ==
+                                                          RecordFieldType
+                                                              .nullValue) {
+                                                        e.value.text = 'null';
+                                                      }
+                                                    });
+                                                  }
+                                                },
+                                                items: const [
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.string,
+                                                    child: Text(
+                                                      'String',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.integer,
+                                                    child: Text(
+                                                      'Integer',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.double,
+                                                    child: Text(
+                                                      'Double',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.boolean,
+                                                    child: Text(
+                                                      'Boolean',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value: RecordFieldType
+                                                        .dateTime,
+                                                    child: Text(
+                                                      'DateTime',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.array,
+                                                    child: Text(
+                                                      'Array',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value:
+                                                        RecordFieldType.object,
+                                                    child: Text(
+                                                      'Object',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value: RecordFieldType
+                                                        .nullValue,
+                                                    child: Text(
+                                                      'Null',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                flex: 3,
+                                                child:
+                                                    types[e.key] ==
+                                                        RecordFieldType.boolean
+                                                    ? DropdownButtonFormField<
+                                                        String
+                                                      >(
+                                                        value:
+                                                            (e.value.text ==
+                                                                    'true' ||
+                                                                e.value.text ==
+                                                                    'false')
+                                                            ? e.value.text
+                                                            : 'true',
+                                                        decoration:
+                                                            const InputDecoration(
+                                                              isDense: true,
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                            ),
+                                                        items: const [
+                                                          DropdownMenuItem(
+                                                            value: 'true',
+                                                            child: Text('True'),
+                                                          ),
+                                                          DropdownMenuItem(
+                                                            value: 'false',
+                                                            child: Text(
+                                                              'False',
+                                                            ),
+                                                          ),
+                                                        ],
+                                                        onChanged: (val) {
+                                                          if (val != null)
+                                                            e.value.text = val;
+                                                        },
+                                                      )
+                                                    : TextField(
+                                                        controller: e.value,
+                                                        enabled:
+                                                            types[e.key] !=
+                                                            RecordFieldType
+                                                                .nullValue,
+                                                        decoration:
+                                                            const InputDecoration(
+                                                              isDense: true,
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                            ),
+                                                      ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: Colors.red,
+                                                ),
+                                                onPressed: () {
+                                                  setDialogState(() {
+                                                    controllers.remove(e.key);
+                                                    types.remove(e.key);
+                                                    formData.remove(e.key);
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.add),
-                              label: const Text('Ekle'),
-                              onPressed: () {
-                                final k = newKeyController.text.trim();
-                                if (k.isNotEmpty && !controllers.containsKey(k)) {
-                                  setDialogState(() {
-                                    formData[k] = '';
-                                    types[k] = RecordFieldType.string;
-                                    controllers[k] = TextEditingController();
-                                    newKeyController.clear();
-                                  });
-                                }
-                              }
-                            )
+                            const Divider(),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: newKeyController,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Yeni Alan (Key)',
+                                      isDense: true,
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Ekle'),
+                                  onPressed: () {
+                                    final k = newKeyController.text.trim();
+                                    if (k.isNotEmpty &&
+                                        !controllers.containsKey(k)) {
+                                      setDialogState(() {
+                                        formData[k] = '';
+                                        types[k] = RecordFieldType.string;
+                                        controllers[k] =
+                                            TextEditingController();
+                                        newKeyController.clear();
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
-                        )
-                      ],
-                    ), // end of Column
-                  ), // end of SizedBox
+                        ), // end of Column
+                      ), // end of SizedBox
               ), // end of ConstrainedBox
               actions: [
                 TextButton(
@@ -1669,7 +1733,7 @@ class _DataExplorerPageState
                     if (isJsonMode) {
                       syncToForm();
                       if (errorMessage != null) {
-                        setDialogState((){});
+                        setDialogState(() {});
                         return;
                       }
                     } else {
@@ -1687,17 +1751,13 @@ class _DataExplorerPageState
     );
   }
 
-  Future<void> _showDeleteDialog(
-    DataRecord record,
-  ) async {
+  Future<void> _showDeleteDialog(DataRecord record) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Kayıt silinsin mi?'),
-          content: Text(
-            '${record.id} numaralı kayıt silinecek.',
-          ),
+          content: Text('${record.id} numaralı kayıt silinecek.'),
           actions: [
             TextButton(
               onPressed: () {
@@ -1728,15 +1788,15 @@ class _DataExplorerPageState
     try {
       await ref.read(dataExplorerProvider.notifier).deleteRecord(record.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kayıt silindi.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Kayıt silindi.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
       }
     }
   }
@@ -1745,8 +1805,7 @@ class _DataExplorerPageState
     DataRecord record, {
     bool readOnly = false,
   }) async {
-    final jsonText =
-        const JsonEncoder.withIndent('  ').convert({
+    final jsonText = const JsonEncoder.withIndent('  ').convert({
       '_id': record.id,
       ...record.data,
       '_createdAt': record.createdAt.toIso8601String(),
@@ -1763,7 +1822,10 @@ class _DataExplorerPageState
               if (readOnly) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
@@ -1771,7 +1833,11 @@ class _DataExplorerPageState
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lock_outline, size: 13, color: AppColors.warning),
+                      Icon(
+                        Icons.lock_outline,
+                        size: 13,
+                        color: AppColors.warning,
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'Sadece Okunabilir',
@@ -1788,10 +1854,7 @@ class _DataExplorerPageState
             ],
           ),
           content: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 650,
-              maxHeight: 600,
-            ),
+            constraints: const BoxConstraints(maxWidth: 650, maxHeight: 600),
             child: SingleChildScrollView(
               child: SelectableText(
                 jsonText,
@@ -1856,10 +1919,7 @@ class _DataExplorerPageState
             '${records.length} kayıt $format olarak kaydedildi: $savePath',
           ),
           duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Tamam',
-            onPressed: () {},
-          ),
+          action: SnackBarAction(label: 'Tamam', onPressed: () {}),
         ),
       );
     } catch (e) {
@@ -1869,12 +1929,16 @@ class _DataExplorerPageState
   }
 
   String _buildJsonExport(List<DataRecord> records) {
-    final docs = records.map((r) => {
-          '_id': r.id,
-          ...r.data,
-          '_createdAt': r.createdAt.toIso8601String(),
-          '_updatedAt': r.updatedAt.toIso8601String(),
-        }).toList();
+    final docs = records
+        .map(
+          (r) => {
+            '_id': r.id,
+            ...r.data,
+            '_createdAt': r.createdAt.toIso8601String(),
+            '_updatedAt': r.updatedAt.toIso8601String(),
+          },
+        )
+        .toList();
     return const JsonEncoder.withIndent('  ').convert(docs);
   }
 
@@ -1888,9 +1952,9 @@ class _DataExplorerPageState
 
     final buffer = StringBuffer();
     // Header satırı
-    buffer.writeln((['_id', ...cols, '_createdAt', '_updatedAt'])
-        .map(_csvEscape)
-        .join(','));
+    buffer.writeln(
+      (['_id', ...cols, '_createdAt', '_updatedAt']).map(_csvEscape).join(','),
+    );
     // Veri satırları
     for (final r in records) {
       final row = [
@@ -1905,9 +1969,7 @@ class _DataExplorerPageState
   }
 
   String _csvEscape(String value) {
-    if (value.contains(',') ||
-        value.contains('"') ||
-        value.contains('\n')) {
+    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
       return '"${value.replaceAll('"', '""')}"';
     }
     return value;
@@ -1928,8 +1990,7 @@ class _DataExplorerPageState
     return const _MessagePanel(
       icon: Icons.touch_app_outlined,
       title: 'Database ve collection seçin',
-      description:
-          'Verileri görüntülemek için üst bölümden seçim yapın.',
+      description: 'Verileri görüntülemek için üst bölümden seçim yapın.',
     );
   }
 
@@ -1942,9 +2003,7 @@ class _DataExplorerPageState
     );
   }
 
-  List<String> _findColumns(
-    List<DataRecord> records,
-  ) {
+  List<String> _findColumns(List<DataRecord> records) {
     final columns = <String>{};
 
     for (final record in records) {
@@ -1972,55 +2031,201 @@ class _DataExplorerPageState
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
+  /// PowerShell ile native dosya seçici açar (mouse_tracker bug'ı önlenir).
+  Future<({String name, Uint8List bytes})?> _pickJsonFileNative() async {
+    try {
+      final result = await Process.run('powershell', [
+        '-command',
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$d = New-Object System.Windows.Forms.OpenFileDialog
+$d.Filter = 'JSON files (*.json)|*.json|All files (*.*)|*.*'
+$d.Title = 'JSON dosyasi sec'
+if ($d.ShowDialog() -eq 'OK') { Write-Output $d.FileName }
+''',
+      ]);
+      final path = result.stdout.toString().trim();
+      if (path.isEmpty) return null;
+
+      final file = File(path);
+      if (!await file.exists()) return null;
+
+      final bytes = await file.readAsBytes();
+      final name = path.split(RegExp(r'[\\/]')).last;
+      return (name: name, bytes: Uint8List.fromList(bytes));
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> _showAddCollectionDialog() async {
-    final controller = TextEditingController();
+    final collectionNameController = TextEditingController();
     final currentDb = _selectedDatabase;
     if (currentDb == null) return;
 
+    String? selectedFileName;
+    List<Map<String, dynamic>>? parsedDocuments;
+    String? fileError;
+
     final bool? confirm = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('${currentDb.name} veritabanına Yeni Collection Ekle'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Collection Adı',
-              hintText: 'örn. ogrenciler',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isNotEmpty) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: const Text('Ekle'),
-            ),
-          ],
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (ctx, setDlgState) {
+            Future<void> handlePickFile() async {
+              setDlgState(() => fileError = null);
+              final picked = await _pickJsonFileNative();
+              if (picked == null) return;
+
+              try {
+                final jsonText = _decodeJsonBytes(picked.bytes);
+                final docs = _parseImportedDocuments(jsonText);
+                setDlgState(() {
+                  selectedFileName = picked.name;
+                  parsedDocuments = docs;
+                  fileError = null;
+                });
+              } on FormatException catch (e) {
+                setDlgState(() {
+                  fileError = e.message;
+                  selectedFileName = null;
+                  parsedDocuments = null;
+                });
+              } catch (e) {
+                setDlgState(() {
+                  fileError = 'JSON okuma hatası: $e';
+                  selectedFileName = null;
+                  parsedDocuments = null;
+                });
+              }
+            }
+
+            return AlertDialog(
+              title: Text('${currentDb.name} – Yeni Collection Ekle'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: collectionNameController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Collection Adı',
+                        hintText: 'örn. ogrenciler',
+                        prefixIcon: Icon(Icons.folder_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'JSON Dosyası İçe Aktarma (İsteğe Bağlı)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (selectedFileName == null)
+                      OutlinedButton.icon(
+                        onPressed: handlePickFile,
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('PC\'den JSON Dosyası Seç'),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$selectedFileName (${parsedDocuments?.length ?? 0} kayıt)',
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              tooltip: 'Dosyayı kaldır',
+                              onPressed: () {
+                                setDlgState(() {
+                                  selectedFileName = null;
+                                  parsedDocuments = null;
+                                  fileError = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (fileError != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        fileError!,
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: Text(
+                    parsedDocuments != null
+                        ? 'Oluştur ve ${parsedDocuments!.length} Kaydı Aktar'
+                        : 'Oluştur',
+                  ),
+                  onPressed: () {
+                    if (collectionNameController.text.trim().isNotEmpty) {
+                      Navigator.pop(dialogContext, true);
+                    }
+                  },
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
     if (confirm == true) {
-      final name = controller.text.trim();
+      final name = collectionNameController.text.trim();
       final currentDbId = _selectedDatabaseId;
 
       if (name.isNotEmpty && currentDbId != null) {
         setState(() {
-          _extraCollections.putIfAbsent(currentDbId, () => <String>{}).add(name);
+          _extraCollections
+              .putIfAbsent(currentDbId, () => <String>{})
+              .add(name);
           _selectedCollection = name;
           _lastSelectedCollection = name;
         });
@@ -2031,18 +2236,32 @@ class _DataExplorerPageState
           final creds = ref.read(credentialsProvider);
           if (creds != null) {
             final tcpRepo = ref.read(socketServiceProvider);
-            tcpRepo.send(
-              action: 'CREATE_COLLECTION',
-              username: creds.username,
-              password: creds.password,
-              database: currentDb.name,
-              collection: name,
-            ).catchError((_) => <String, dynamic>{});
+            tcpRepo
+                .send(
+                  action: 'CREATE_COLLECTION',
+                  username: creds.username,
+                  password: creds.password,
+                  database: currentDb.name,
+                  collection: name,
+                )
+                .catchError((_) => <String, dynamic>{});
           }
           ref.invalidate(dataExplorerProvider);
         } catch (_) {}
 
-        if (mounted) {
+        // Eğer JSON dosyası seçilmişse kayıtları bu koleksiyona aktar
+        if (parsedDocuments != null && parsedDocuments!.isNotEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  "'$name' oluşturuldu. ${parsedDocuments!.length} kayıt aktarılıyor...",
+                ),
+              ),
+            );
+          }
+          await _importDocuments(parsedDocuments!);
+        } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("'$name' koleksiyonu oluşturuldu."),
@@ -2064,7 +2283,9 @@ class _DataExplorerPageState
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Collection Silinsin mi?'),
-          content: Text("'$currentCol' koleksiyonu ve içindeki tüm kayıtlar silinecek. Emin misiniz?"),
+          content: Text(
+            "'$currentCol' koleksiyonu ve içindeki tüm kayıtlar silinecek. Emin misiniz?",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -2088,20 +2309,24 @@ class _DataExplorerPageState
         final creds = ref.read(credentialsProvider);
         if (creds != null) {
           final tcpRepo = ref.read(socketServiceProvider);
-          await tcpRepo.send(
-            action: 'DROP_COLLECTION',
-            username: creds.username,
-            password: creds.password,
-            database: currentDb.name,
-            collection: currentCol,
-          ).catchError((_) => <String, dynamic>{});
-          await tcpRepo.send(
-            action: 'DELETE_COLLECTION',
-            username: creds.username,
-            password: creds.password,
-            database: currentDb.name,
-            collection: currentCol,
-          ).catchError((_) => <String, dynamic>{});
+          await tcpRepo
+              .send(
+                action: 'DROP_COLLECTION',
+                username: creds.username,
+                password: creds.password,
+                database: currentDb.name,
+                collection: currentCol,
+              )
+              .catchError((_) => <String, dynamic>{});
+          await tcpRepo
+              .send(
+                action: 'DELETE_COLLECTION',
+                username: creds.username,
+                password: creds.password,
+                database: currentDb.name,
+                collection: currentCol,
+              )
+              .catchError((_) => <String, dynamic>{});
         }
       } catch (_) {}
 
@@ -2143,18 +2368,12 @@ class _InfoBadge extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoBadge({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoBadge({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
@@ -2162,11 +2381,7 @@ class _InfoBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 17,
-            color: AppColors.primary,
-          ),
+          Icon(icon, size: 17, color: AppColors.primary),
           const SizedBox(width: 7),
           Text(
             text,
@@ -2182,15 +2397,11 @@ class _InfoBadge extends StatelessWidget {
   }
 }
 
-class _ImportInformationRow
-    extends StatelessWidget {
+class _ImportInformationRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _ImportInformationRow({
-    required this.label,
-    required this.value,
-  });
+  const _ImportInformationRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -2244,19 +2455,13 @@ class _MessagePanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 52,
-              color: AppColors.textSecondary,
-            ),
+            Icon(icon, size: 52, color: AppColors.textSecondary),
             const SizedBox(height: 15),
             Text(
               title,
@@ -2271,9 +2476,7 @@ class _MessagePanel extends StatelessWidget {
             Text(
               description,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-              ),
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),
