@@ -42,6 +42,8 @@ class _DataTypeExplorerPageState
   String _bulkTargetType = 'String';
 
   bool _isSavingToDb = false;
+  bool _isRecordLevelMode = false;
+  final Map<String, Map<String, String>> _recordCustomTypes = {};
 
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _verticalScrollController = ScrollController();
@@ -317,38 +319,70 @@ class _DataTypeExplorerPageState
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Koleksiyon chip'leri
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: cols.map((c) {
-                final isSelected = c == _selectedCollection;
-                return ChoiceChip(
-                  label: Text(c),
-                  selected: isSelected,
-                  selectedColor: AppColors.primary.withOpacity(0.15),
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? AppColors.primary
-                        : (isDark ? Colors.white70 : AppColors.textPrimary),
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.normal,
+            // Koleksiyon chip'leri + Mod Seçici
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: cols.map((c) {
+                      final isSelected = c == _selectedCollection;
+                      return ChoiceChip(
+                        label: Text(c),
+                        selected: isSelected,
+                        selectedColor: AppColors.primary.withOpacity(0.15),
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark ? Colors.white70 : AppColors.textPrimary),
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _selectedCollection = c;
+                              _lastSelectedCollection = c;
+                              _selectedFields.clear();
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
                   ),
-                  onSelected: (sel) {
-                    if (sel) {
-                      setState(() {
-                        _selectedCollection = c;
-                        _lastSelectedCollection = c;
-                        _selectedFields.clear();
-                      });
-                    }
+                ),
+                const SizedBox(width: 12),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(
+                      value: false,
+                      icon: Icon(Icons.schema_outlined),
+                      label: Text('Genel Şema'),
+                    ),
+                    ButtonSegment<bool>(
+                      value: true,
+                      icon: Icon(Icons.badge_outlined),
+                      label: Text('Kayıt Bazlı Düzenle'),
+                    ),
+                  ],
+                  selected: {_isRecordLevelMode},
+                  onSelectionChanged: (val) {
+                    setState(() {
+                      _isRecordLevelMode = val.first;
+                    });
                   },
-                );
-              }).toList(),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             if (_selectedCollection != null)
-              _buildSchemaSection(selectedDb.name, _selectedCollection!, isDark),
+              _isRecordLevelMode
+                  ? _buildRecordLevelTypeEditor(
+                      selectedDb.name, _selectedCollection!, isDark)
+                  : _buildSchemaSection(
+                      selectedDb.name, _selectedCollection!, isDark),
           ],
         );
       },
@@ -1525,6 +1559,406 @@ class _DataTypeExplorerPageState
         return const Color(0xFFF97316);
       default:
         return const Color(0xFF64748B);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Kayıt Bazlı Tip Düzenleyici (Her Kaydın Alan Tiplerini Ayrı Ayrı Yönetme)
+  // ════════════════════════════════════════════════════════════════════════
+
+  Widget _buildRecordLevelTypeEditor(
+      String dbName, String colName, bool isDark) {
+    return FutureBuilder<List<DataRecord>>(
+      future: ref.read(dataExplorerRepositoryProvider).getRecords(
+            databaseId: dbName,
+            collectionName: colName,
+          ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        final records = snapshot.data ?? [];
+
+        if (records.isEmpty) {
+          return _buildEmptyBox(
+            icon: Icons.table_rows_outlined,
+            title: 'Bu koleksiyonda henüz kayıt bulunmamaktadır.',
+            subtitle:
+                'Kayıt eklendikçe her kaydın alan tiplerini ayrı ayrı burada düzenleyebilirsiniz.',
+            isDark: isDark,
+          );
+        }
+
+        final filteredRecords = records.where((r) {
+          if (_searchQuery.isEmpty) return true;
+          final matchId =
+              r.id.toLowerCase().contains(_searchQuery.toLowerCase());
+          final matchData = r.data.entries.any((e) =>
+              e.key.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              e.value.toString().toLowerCase().contains(_searchQuery.toLowerCase()));
+          return matchId || matchData;
+        }).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Üst Bilgi + Kaydet Butonu
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Kayıt ID veya alan içeriğine göre ara...',
+                      prefixIcon: const Icon(Icons.search),
+                      isDense: true,
+                      filled: true,
+                      fillColor:
+                          isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (_canUpdateType)
+                  ElevatedButton.icon(
+                    onPressed: _isSavingToDb
+                        ? null
+                        : () => _saveAllRecordLevelTypes(
+                              dbName, colName, records),
+                    icon: _isSavingToDb
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_isSavingToDb
+                        ? 'Veritabanına Kaydediliyor...'
+                        : 'Tüm Kayıt Değişikliklerini Kaydet'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Kayıt Kartları Listesi
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredRecords.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              itemBuilder: (context, index) {
+                final rec = filteredRecords[index];
+                return _buildSingleRecordTypeCard(dbName, colName, rec, isDark);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSingleRecordTypeCard(
+    String dbName,
+    String colName,
+    DataRecord rec,
+    bool isDark,
+  ) {
+    _recordCustomTypes.putIfAbsent(rec.id, () => {});
+    final recTypes = _recordCustomTypes[rec.id]!;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Kart Başlığı
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.badge_outlined,
+                    size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Kayıt ID: ${rec.id}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                if (_canUpdateType)
+                  ElevatedButton.icon(
+                    onPressed: () => _saveSingleRecordType(dbName, colName, rec),
+                    icon: const Icon(Icons.save, size: 14),
+                    label: const Text('Bu Kaydı Güncelle'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Alanlar Listesi
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: rec.data.entries.map((entry) {
+                final key = entry.key;
+                final val = entry.value;
+                final currentInferred = _inferType(val);
+                final assignedType = recTypes[key] ?? currentInferred;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A).withOpacity(0.5)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Alan Adı
+                      SizedBox(
+                        width: 150,
+                        child: Row(
+                          children: [
+                            Icon(_iconForType(assignedType),
+                                size: 16, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                key,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  fontSize: 13,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Mevcut Değer Gösterimi
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: Text(
+                            val.toString(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Tip Seçici Dropdown
+                      SizedBox(
+                        width: 140,
+                        child: DropdownButtonFormField<String>(
+                          value: _validTypeValue(assignedType),
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _typeOptions
+                              .map((t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text(t,
+                                        style: const TextStyle(fontSize: 12)),
+                                  ))
+                              .toList(),
+                          onChanged: _canUpdateType
+                              ? (valType) {
+                                  if (valType != null) {
+                                    setState(() {
+                                      recTypes[key] = valType;
+                                      rec.data[key] =
+                                          _convertValueToType(val, valType);
+                                    });
+                                  }
+                                }
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveSingleRecordType(
+      String dbName, String colName, DataRecord rec) async {
+    try {
+      final creds = ref.read(credentialsProvider);
+      final tcpRepo = ref.read(socketServiceProvider);
+
+      if (creds != null) {
+        await tcpRepo.send(
+          action: 'UPDATE',
+          username: creds.username,
+          password: creds.password,
+          database: dbName,
+          collection: colName,
+          filter: {'_id': rec.id},
+          document: rec.data,
+        );
+
+        ref.invalidate(dataExplorerProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "ID '${rec.id}' kaydının veri tipleri güncellendi ve veritabanına kaydedildi!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Güncelleme hatası: $e"),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveAllRecordLevelTypes(
+      String dbName, String colName, List<DataRecord> records) async {
+    setState(() {
+      _isSavingToDb = true;
+    });
+
+    try {
+      final creds = ref.read(credentialsProvider);
+      final tcpRepo = ref.read(socketServiceProvider);
+
+      int updatedCount = 0;
+      for (final rec in records) {
+        if (creds != null) {
+          await tcpRepo.send(
+            action: 'UPDATE',
+            username: creds.username,
+            password: creds.password,
+            database: dbName,
+            collection: colName,
+            filter: {'_id': rec.id},
+            document: rec.data,
+          );
+          updatedCount++;
+        }
+      }
+
+      ref.invalidate(dataExplorerProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                "Tüm $updatedCount kaydın özel tipleri veritabanına başarıyla kaydedildi!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Kaydetme hatası: $e"),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingToDb = false;
+        });
+      }
     }
   }
 
