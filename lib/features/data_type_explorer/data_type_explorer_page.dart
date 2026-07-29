@@ -40,6 +40,8 @@ class _DataTypeExplorerPageState
   String _searchQuery = '';
   String _bulkTargetType = 'String';
 
+  bool _isSavingToDb = false;
+
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _verticalScrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
@@ -504,6 +506,35 @@ class _DataTypeExplorerPageState
                     ),
                   ),
                 ),
+                if (_canUpdateType) ...[
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: _isSavingToDb
+                        ? null
+                        : () => _confirmAndSaveTypesToDatabase(
+                              dbName, colName, records, fieldsMap),
+                    icon: _isSavingToDb
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_isSavingToDb
+                        ? 'Veritabanına Kaydediliyor...'
+                        : 'Değişiklikleri Veritabanına Kaydet'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -897,6 +928,192 @@ class _DataTypeExplorerPageState
             "${_selectedFields.length} alanın tipi varsayılana sıfırlandı."),
       ),
     );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Veri Tiplerini Tüm Kayıtlarda Dönüştürüp Veritabanına Kaydetme
+  // ════════════════════════════════════════════════════════════════════════
+
+  Future<void> _confirmAndSaveTypesToDatabase(
+    String dbName,
+    String colName,
+    List<DataRecord> records,
+    Map<String, _FieldInfo> fieldsMap,
+  ) async {
+    final modifiedFields = <String, String>{};
+    fieldsMap.forEach((key, info) {
+      final customKey = '${dbName}_${colName}_$key';
+      final customType = _customTypes[customKey];
+      if (customType != null) {
+        modifiedFields[key] = customType;
+      }
+    });
+
+    if (modifiedFields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Henüz veritabanında değiştirilecek özel veri tipi atamadınız.'),
+        ),
+      );
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Veri Tiplerini Veritabanına Kaydet'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "'$colName' koleksiyonundaki ${records.length} kaydın değerleri aşağıdaki tiplere dönüştürülüp veritabanına kaydedilecek:",
+              ),
+              const SizedBox(height: 12),
+              ...modifiedFields.entries.map((e) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.arrow_right, size: 18),
+                      Text(
+                        '${e.key}: ',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(e.value, style: const TextStyle(color: AppColors.primary)),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+              const Text(
+                'Bu işlem koleksiyondaki kayıtların gerçek veri türlerini değiştirecektir.',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.amber),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.save),
+              label: const Text('Evet, Dönüştür ve Kaydet'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isSavingToDb = true;
+    });
+
+    try {
+      final creds = ref.read(credentialsProvider);
+      final tcpRepo = ref.read(socketServiceProvider);
+
+      int updatedCount = 0;
+      for (final rec in records) {
+        final Map<String, dynamic> updatedData = Map<String, dynamic>.from(rec.data);
+        bool recordChanged = false;
+
+        modifiedFields.forEach((fieldKey, targetType) {
+          if (updatedData.containsKey(fieldKey)) {
+            final oldVal = updatedData[fieldKey];
+            final newVal = _convertValueToType(oldVal, targetType);
+            updatedData[fieldKey] = newVal;
+            recordChanged = true;
+          }
+        });
+
+        if (recordChanged && creds != null) {
+          await tcpRepo.send(
+            action: 'UPDATE',
+            username: creds.username,
+            password: creds.password,
+            database: dbName,
+            collection: colName,
+            filter: {'_id': rec.id},
+            document: updatedData,
+          );
+          updatedCount++;
+        }
+      }
+
+      // Veritabanı ve Data Explorer durumlarını yenile
+      ref.invalidate(dataExplorerProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Başarılı! '$colName' koleksiyonundaki $updatedCount kaydın tipleri veritabanında dönüştürüldü ve kaydedildi.",
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Kaydetme hatası: $e"),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingToDb = false;
+        });
+      }
+    }
+  }
+
+  dynamic _convertValueToType(dynamic val, String targetType) {
+    if (val == null) return null;
+    final strVal = val.toString().trim();
+
+    switch (targetType) {
+      case 'Integer':
+        return int.tryParse(strVal) ?? num.tryParse(strVal)?.toInt() ?? val;
+      case 'Double':
+        return double.tryParse(strVal) ?? num.tryParse(strVal)?.toDouble() ?? val;
+      case 'Boolean':
+        final lower = strVal.toLowerCase();
+        return (lower == 'true' || lower == '1' || val == true || val == 1);
+      case 'String':
+        return strVal;
+      case 'DateTime':
+        return strVal;
+      case 'Array':
+        if (val is List) return val;
+        try {
+          final decoded = jsonDecode(strVal);
+          if (decoded is List) return decoded;
+        } catch (_) {}
+        return [val];
+      case 'Object':
+        if (val is Map) return val;
+        try {
+          final decoded = jsonDecode(strVal);
+          if (decoded is Map) return decoded;
+        } catch (_) {}
+        return {'value': val};
+      default:
+        return val;
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════
