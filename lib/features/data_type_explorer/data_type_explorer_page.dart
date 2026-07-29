@@ -1084,27 +1084,59 @@ class _DataTypeExplorerPageState
 
   dynamic _convertValueToType(dynamic val, String targetType) {
     if (val == null) return null;
-    final strVal = val.toString().trim();
+    var strVal = val.toString().trim();
 
     switch (targetType) {
       case 'Integer':
+        if (val is List && val.isNotEmpty) {
+          return int.tryParse(val.first.toString()) ?? 0;
+        }
         return int.tryParse(strVal) ?? num.tryParse(strVal)?.toInt() ?? val;
+
       case 'Double':
+        if (val is List && val.isNotEmpty) {
+          return double.tryParse(val.first.toString()) ?? 0.0;
+        }
         return double.tryParse(strVal) ?? num.tryParse(strVal)?.toDouble() ?? val;
+
       case 'Boolean':
         final lower = strVal.toLowerCase();
         return (lower == 'true' || lower == '1' || val == true || val == 1);
+
       case 'String':
+        if (val is List) {
+          return val.map((e) => e.toString().replaceAll(RegExp(r'^["\']|["\']$'), '')).join(', ');
+        }
+        if (val is Map) {
+          return jsonEncode(val);
+        }
+        // Eğer string başında/sonunda [ ] parantezleri varsa temizle
+        if (strVal.startsWith('[') && strVal.endsWith(']')) {
+          final content = strVal.substring(1, strVal.length - 1).trim();
+          try {
+            final decoded = jsonDecode(strVal);
+            if (decoded is List) {
+              return decoded.map((e) => e.toString()).join(', ');
+            }
+          } catch (_) {}
+          return content.replaceAll(RegExp(r'^["\']|["\']$'), '');
+        }
         return strVal;
+
       case 'DateTime':
         return strVal;
+
       case 'Array':
         if (val is List) return val;
         try {
           final decoded = jsonDecode(strVal);
           if (decoded is List) return decoded;
         } catch (_) {}
+        if (strVal.contains(',')) {
+          return strVal.split(',').map((e) => e.trim()).toList();
+        }
         return [val];
+
       case 'Object':
         if (val is Map) return val;
         try {
@@ -1112,6 +1144,7 @@ class _DataTypeExplorerPageState
           if (decoded is Map) return decoded;
         } catch (_) {}
         return {'value': val};
+
       default:
         return val;
     }
