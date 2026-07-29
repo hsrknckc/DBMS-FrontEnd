@@ -1,11 +1,15 @@
+import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
-import '../../models/database_item.dart';
 import '../../models/data_record.dart';
+import '../../models/database_item.dart';
 import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
 
@@ -18,10 +22,12 @@ class DataTypeExplorerPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<DataTypeExplorerPage> createState() => _DataTypeExplorerPageState();
+  ConsumerState<DataTypeExplorerPage> createState() =>
+      _DataTypeExplorerPageState();
 }
 
-class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
+class _DataTypeExplorerPageState
+    extends ConsumerState<DataTypeExplorerPage> {
   static String? _lastSelectedDatabaseId;
   static String? _lastSelectedCollection;
 
@@ -30,12 +36,27 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
 
   final Map<String, String> _customTypes = {};
   final Map<String, List<String>> _extraCollections = {};
+  final Set<String> _selectedFields = {};
+  String _searchQuery = '';
+  String _bulkTargetType = 'String';
+
+  final ScrollController _horizontalScrollController = ScrollController();
+  final ScrollController _verticalScrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _selectedDatabaseId = _lastSelectedDatabaseId;
     _selectedCollection = _lastSelectedCollection;
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _verticalScrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   bool get _canView =>
@@ -53,20 +74,37 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   @override
   Widget build(BuildContext context) {
     final dbsAsync = ref.watch(databasesProvider);
-    final databases = dbsAsync.valueOrNull ?? [];
+    final rawDatabases = dbsAsync.valueOrNull ?? [];
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Veritabanı isimlerini deduplicate et
+    final seenKeys = <String>{};
+    final List<DatabaseItem> databases = [];
+    for (final db in rawDatabases) {
+      final key = db.name.isNotEmpty ? db.name : db.id;
+      if (seenKeys.add(key)) {
+        databases.add(db);
+      }
+    }
 
     if (!_canView) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 48, color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary,
+            ),
             const SizedBox(height: 16),
             Text(
               'Bu sayfayı görüntülemek için yetkiniz bulunmamaktadır.',
-              style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary, fontSize: 16),
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -74,11 +112,14 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     }
 
     if (_selectedDatabaseId == null && databases.isNotEmpty) {
-      _selectedDatabaseId = databases.first.id;
+      _selectedDatabaseId =
+          databases.first.name.isNotEmpty ? databases.first.name : databases.first.id;
     }
 
     final selectedDb = databases.firstWhere(
-      (d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId,
+      (d) =>
+          d.id == _selectedDatabaseId ||
+          d.name == _selectedDatabaseId,
       orElse: () => databases.isNotEmpty
           ? databases.first
           : DatabaseItem(
@@ -99,21 +140,34 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Başlık ──
-          Text(
-            'Data Type Explorer',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Koleksiyonların alan adlarını, veri tiplerini inceleyin ve güncelleyin.',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Data Type Explorer',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Koleksiyonların alan adlarını inceleyin, veri tiplerini tekli veya toplu olarak yönetin.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
 
@@ -126,7 +180,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             _buildEmptyBox(
               icon: Icons.storage_outlined,
               title: 'Henüz veritabanı bulunmamaktadır.',
-              subtitle: 'Veritabanı oluşturmak için Databases sayfasını kullanın.',
+              subtitle:
+                  'Veritabanı oluşturmak için Databases sayfasını kullanın.',
               isDark: isDark,
             )
           else
@@ -140,10 +195,10 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   //  Veritabanı Seçici
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildDatabaseSelector(List<DatabaseItem> databases, DatabaseItem selectedDb, bool isDark) {
+  Widget _buildDatabaseSelector(
+      List<DatabaseItem> databases, DatabaseItem selectedDb, bool isDark) {
     return Row(
       children: [
-        // Veritabanı dropdown
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -156,16 +211,28 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.storage_outlined, size: 18, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
+              Icon(
+                Icons.storage_outlined,
+                size: 18,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : AppColors.textSecondary,
+              ),
               const SizedBox(width: 8),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: databases.any((d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId)
+                  value: databases.any(
+                          (d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId)
                       ? _selectedDatabaseId
-                      : (databases.isNotEmpty ? databases.first.id : null),
+                      : (databases.isNotEmpty
+                          ? (databases.first.name.isNotEmpty
+                              ? databases.first.name
+                              : databases.first.id)
+                          : null),
                   items: databases.map((db) {
+                    final key = db.name.isNotEmpty ? db.name : db.id;
                     return DropdownMenuItem<String>(
-                      value: db.id,
+                      value: key,
                       child: Text(db.name),
                     );
                   }).toList(),
@@ -176,6 +243,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                         _lastSelectedDatabaseId = val;
                         _selectedCollection = null;
                         _lastSelectedCollection = null;
+                        _selectedFields.clear();
                       });
                     }
                   },
@@ -185,7 +253,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
           ),
         ),
         const SizedBox(width: 12),
-        if (_canCreateCollection && selectedDb.id.isNotEmpty)
+        if (_canCreateCollection && selectedDb.name.isNotEmpty)
           ElevatedButton.icon(
             onPressed: () => _showAddCollectionDialog(selectedDb.name),
             icon: const Icon(Icons.add, size: 18),
@@ -193,8 +261,10 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
       ],
@@ -202,19 +272,27 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  Ana İçerik: Koleksiyon Seçimi + Şema Tablosu
+  //  Ana İçerik: Koleksiyon Seçimi + Şema Görünümü
   // ════════════════════════════════════════════════════════════════════════
 
   Widget _buildMainContent(DatabaseItem selectedDb, bool isDark) {
     return FutureBuilder<List<String>>(
-      future: ref.read(dataExplorerRepositoryProvider).getCollections(selectedDb.name),
+      future: ref
+          .read(dataExplorerRepositoryProvider)
+          .getCollections(selectedDb.name),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
         final cols = (snapshot.data ?? []).toList();
-        final extra = _extraCollections[selectedDb.id] ?? [];
+        final dbKey = selectedDb.name.isNotEmpty ? selectedDb.name : selectedDb.id;
+        final extra = _extraCollections[dbKey] ?? _extraCollections[selectedDb.id] ?? [];
         for (final e in extra) {
           if (!cols.contains(e)) cols.add(e);
         }
@@ -227,7 +305,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
           return _buildEmptyBox(
             icon: Icons.folder_open_outlined,
             title: 'Bu veritabanında henüz koleksiyon bulunmamaktadır.',
-            subtitle: 'Koleksiyon eklemek için yukarıdaki butonu kullanabilirsiniz.',
+            subtitle:
+                'Koleksiyon eklemek için yukarıdaki butonu kullanabilirsiniz.',
             isDark: isDark,
           );
         }
@@ -244,16 +323,20 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                 return ChoiceChip(
                   label: Text(c),
                   selected: isSelected,
-                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                  selectedColor: AppColors.primary.withOpacity(0.15),
                   labelStyle: TextStyle(
-                    color: isSelected ? AppColors.primary : (isDark ? Colors.white70 : AppColors.textPrimary),
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected
+                        ? AppColors.primary
+                        : (isDark ? Colors.white70 : AppColors.textPrimary),
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                   onSelected: (sel) {
                     if (sel) {
                       setState(() {
                         _selectedCollection = c;
                         _lastSelectedCollection = c;
+                        _selectedFields.clear();
                       });
                     }
                   },
@@ -262,7 +345,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             ),
             const SizedBox(height: 24),
             if (_selectedCollection != null)
-              _buildSchemaTable(selectedDb.name, _selectedCollection!, isDark),
+              _buildSchemaSection(selectedDb.name, _selectedCollection!, isDark),
           ],
         );
       },
@@ -270,10 +353,10 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  Şema Tablosu: Alanlar + Veri Tipleri
+  //  Şema Yönetim Bölümü: İstatistikler + Arama + Toplu İşlem + Tablo
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSchemaTable(String dbName, String colName, bool isDark) {
+  Widget _buildSchemaSection(String dbName, String colName, bool isDark) {
     return FutureBuilder<List<DataRecord>>(
       future: ref.read(dataExplorerRepositoryProvider).getRecords(
             databaseId: dbName,
@@ -281,22 +364,27 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
           ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()));
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
         final records = snapshot.data ?? [];
 
-        // ── Boş koleksiyon ──
         if (records.isEmpty) {
           return _buildEmptyBox(
             icon: Icons.table_rows_outlined,
             title: 'Bu koleksiyonda henüz kayıt bulunmamaktadır.',
-            subtitle: 'Kayıt eklendikçe alan adları ve veri tipleri burada otomatik olarak görünecektir.',
+            subtitle:
+                'Kayıt eklendikçe şema ve veri tipleri burada otomatik olarak yönetilebilir hale gelecektir.',
             isDark: isDark,
           );
         }
 
-        // ── Alanları ve tiplerini tüm kayıtlardan çıkar ──
+        // ── Tüm kayıtlardan alan adlarını ve otomatik tiplerini çıkar ──
         final fieldsMap = <String, _FieldInfo>{};
         for (final r in records) {
           r.data.forEach((key, val) {
@@ -305,169 +393,752 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             } else {
               fieldsMap[key] = _FieldInfo(
                 inferredType: _inferType(val),
-                sampleValue: val,
                 sampleCount: 1,
               );
             }
           });
         }
 
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Üst bilgi satırı
+        // Arama filtresi
+        final filteredEntries = fieldsMap.entries.where((e) {
+          if (_searchQuery.isEmpty) return true;
+          return e.key.toLowerCase().contains(_searchQuery.toLowerCase());
+        }).toList();
+
+        // İstatistik hesaplamaları
+        int customCount = 0;
+        for (final key in fieldsMap.keys) {
+          final customKey = '${dbName}_${colName}_$key';
+          if (_customTypes.containsKey(customKey) &&
+              _customTypes[customKey] != fieldsMap[key]!.inferredType) {
+            customCount++;
+          }
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Üst İstatistik Kartları ──
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 700;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildStatCard(
+                      icon: Icons.tune_outlined,
+                      label: 'Toplam Alan',
+                      value: '${fieldsMap.length}',
+                      color: AppColors.primary,
+                      isDark: isDark,
+                      width: isNarrow ? constraints.maxWidth : 160,
+                    ),
+                    _buildStatCard(
+                      icon: Icons.edit_note_outlined,
+                      label: 'Özel Atanan Tip',
+                      value: '$customCount',
+                      color: customCount > 0 ? Colors.amber.shade700 : Colors.blueGrey,
+                      isDark: isDark,
+                      width: isNarrow ? constraints.maxWidth : 160,
+                    ),
+                    _buildStatCard(
+                      icon: Icons.check_box_outlined,
+                      label: 'Seçili Alan',
+                      value: '${_selectedFields.length}',
+                      color: _selectedFields.isNotEmpty ? Colors.green : Colors.grey,
+                      isDark: isDark,
+                      width: isNarrow ? constraints.maxWidth : 160,
+                    ),
+                    _buildStatCard(
+                      icon: Icons.auto_graph_outlined,
+                      label: 'Kayıt Sayısı',
+                      value: '${records.length}',
+                      color: Colors.purple,
+                      isDark: isDark,
+                      width: isNarrow ? constraints.maxWidth : 160,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // ── Arama Barı ve Kod Aktarma Butonu ──
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Alan adına göre ara...',
+                      prefixIcon: const Icon(Icons.search),
+                      isDense: true,
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _showExportCodeDialog(dbName, colName, fieldsMap),
+                  icon: const Icon(Icons.code),
+                  label: const Text('Şemayı Kod Olarak Aktar'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ── Toplu İşlem Barı (Bulk Action Bar) ──
+            if (_canUpdateType && _selectedFields.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.schema_outlined, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.checklist, color: AppColors.primary),
+                    const SizedBox(width: 10),
                     Text(
-                      '$colName — ${fieldsMap.length} alan, ${records.length} kayıt',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      '${_selectedFields.length} alan seçildi',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
                       ),
+                    ),
+                    const Spacer(),
+                    const Text('Toplu Tip:', style: TextStyle(fontSize: 13)),
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: _bulkTargetType,
+                      underline: const SizedBox(),
+                      items: _typeOptions
+                          .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _bulkTargetType = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _applyBulkTypeChange(dbName, colName),
+                      icon: const Icon(Icons.done_all, size: 16),
+                      label: const Text('Toplu Uygula'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () => _resetSelectedTypes(dbName, colName, fieldsMap),
+                      icon: const Icon(Icons.restart_alt, size: 16),
+                      label: const Text('Varsayılana Dön'),
                     ),
                   ],
                 ),
               ),
 
-              // Tablo
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(
-                    isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  ),
-                  columns: const [
-                    DataColumn(label: Text('Alan Adı', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Algılanan Tip', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Atanan Tip', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Kayıt Sayısı', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Durum', style: TextStyle(fontWeight: FontWeight.bold))),
-                  ],
-                  rows: fieldsMap.entries.map((entry) {
-                    final key = entry.key;
-                    final info = entry.value;
-                    final customKey = '${dbName}_${colName}_$key';
-                    final customType = _customTypes[customKey];
-                    final isOverridden = customType != null && customType != info.inferredType;
-
-                    return DataRow(
-                      cells: [
-                        // Alan adı
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(_iconForType(customType ?? info.inferredType), size: 16, color: AppColors.primary),
-                              const SizedBox(width: 8),
-                              Text(key, style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'monospace')),
-                            ],
-                          ),
-                        ),
-
-                        // Algılanan (otomatik) tip
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _colorForType(info.inferredType).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              info.inferredType,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: _colorForType(info.inferredType),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Atanan tip (dropdown – yetki yoksa disabled)
-                        DataCell(
-                          DropdownButton<String>(
-                            value: _validTypeValue(customType ?? info.inferredType),
-                            underline: const SizedBox(),
-                            items: _typeOptions
-                                .map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13))))
-                                .toList(),
-                            onChanged: _canUpdateType
-                                ? (val) {
-                                    if (val != null) {
-                                      setState(() {
-                                        _customTypes[customKey] = val;
-                                      });
-                                    }
-                                  }
-                                : null,
-                          ),
-                        ),
-
-                        // Kayıt sayısı
-                        DataCell(Text('${info.sampleCount} / ${records.length}')),
-
-                        // Durum chip'i
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isOverridden
-                                  ? Colors.amber.withValues(alpha: 0.15)
-                                  : Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              isOverridden ? 'Özel' : 'Otomatik',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isOverridden ? Colors.amber.shade800 : Colors.green.shade700,
-                              ),
-                            ),
+            // ── Şema Tablosu ──
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Tablo Başlık Barı
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.schema_outlined,
+                            size: 18, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$colName — ${filteredEntries.length} alan gösteriliyor',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
                           ),
                         ),
                       ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                    ),
+                  ),
 
-              // Yetki uyarısı
-              if (!_canUpdateType)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 16, color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Veri tiplerini değiştirmek için güncelleme yetkiniz bulunmamaktadır.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary,
+                  // Fare desteği ile Tablo Görünümü
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context).copyWith(
+                      dragDevices: {
+                        PointerDeviceKind.touch,
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.trackpad,
+                      },
+                    ),
+                    child: Scrollbar(
+                      controller: _horizontalScrollController,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _horizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          controller: _verticalScrollController,
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(
+                              isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
+                            ),
+                            columns: [
+                              if (_canUpdateType)
+                                DataColumn(
+                                  label: Checkbox(
+                                    value: filteredEntries.isNotEmpty &&
+                                        filteredEntries.every(
+                                            (e) => _selectedFields.contains(e.key)),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) {
+                                          _selectedFields.addAll(
+                                              filteredEntries.map((e) => e.key));
+                                        } else {
+                                          _selectedFields.removeAll(
+                                              filteredEntries.map((e) => e.key));
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              const DataColumn(
+                                label: Text('Alan Adı',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              const DataColumn(
+                                label: Text('Otomatik Algılanan Tip',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              const DataColumn(
+                                label: Text('Atanan Tip (Düzenle)',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              const DataColumn(
+                                label: Text('Varlık Oranı',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              const DataColumn(
+                                label: Text('Durum',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                            rows: filteredEntries.map((entry) {
+                              final key = entry.key;
+                              final info = entry.value;
+                              final customKey = '${dbName}_${colName}_$key';
+                              final customType = _customTypes[customKey];
+                              final activeType = customType ?? info.inferredType;
+                              final isOverridden = customType != null &&
+                                  customType != info.inferredType;
+
+                              final isSelected = _selectedFields.contains(key);
+                              final percent = (info.sampleCount / records.length * 100).toStringAsFixed(0);
+
+                              return DataRow(
+                                selected: isSelected,
+                                onSelectChanged: _canUpdateType
+                                    ? (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            _selectedFields.add(key);
+                                          } else {
+                                            _selectedFields.remove(key);
+                                          }
+                                        });
+                                      }
+                                    : null,
+                                cells: [
+                                  if (_canUpdateType)
+                                    DataCell(
+                                      Checkbox(
+                                        value: isSelected,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            if (val == true) {
+                                              _selectedFields.add(key);
+                                            } else {
+                                              _selectedFields.remove(key);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    ),
+
+                                  // Alan adı
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(_iconForType(activeType),
+                                            size: 16, color: AppColors.primary),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          key,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Otomatik algılanan tip
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _colorForType(info.inferredType)
+                                            .withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        info.inferredType,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: _colorForType(info.inferredType),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Atanan tip (dropdown)
+                                  DataCell(
+                                    DropdownButton<String>(
+                                      value: _validTypeValue(activeType),
+                                      underline: const SizedBox(),
+                                      items: _typeOptions
+                                          .map((t) => DropdownMenuItem(
+                                                value: t,
+                                                child: Text(t,
+                                                    style: const TextStyle(
+                                                        fontSize: 13)),
+                                              ))
+                                          .toList(),
+                                      onChanged: _canUpdateType
+                                          ? (val) {
+                                              if (val != null) {
+                                                setState(() {
+                                                  _customTypes[customKey] = val;
+                                                });
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                        "'$key' alanının tipi '$val' olarak güncellendi."),
+                                                    duration:
+                                                        const Duration(seconds: 2),
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          : null,
+                                    ),
+                                  ),
+
+                                  // Varlık oranı
+                                  DataCell(
+                                    Text(
+                                      '${info.sampleCount} / ${records.length} kayıt (%$percent)',
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+
+                                  // Durum rozeti
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isOverridden
+                                            ? Colors.amber.withOpacity(0.15)
+                                            : Colors.green.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        isOverridden ? 'Özel' : 'Otomatik',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isOverridden
+                                              ? Colors.amber.shade800
+                                              : Colors.green.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
+                    ),
+                  ),
+
+                  if (!_canUpdateType)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 16,
+                              color: isDark
+                                  ? const Color(0xFF64748B)
+                                  : AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Veri tiplerini değiştirmek için güncelleme yetkiniz bulunmamaktadır.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? const Color(0xFF64748B)
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Toplu İşlemler & Sıfırlama
+  // ════════════════════════════════════════════════════════════════════════
+
+  void _applyBulkTypeChange(String dbName, String colName) {
+    if (_selectedFields.isEmpty) return;
+
+    setState(() {
+      for (final key in _selectedFields) {
+        final customKey = '${dbName}_${colName}_$key';
+        _customTypes[customKey] = _bulkTargetType;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            "${_selectedFields.length} alanın tipi topluca '$_bulkTargetType' olarak güncellendi."),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _resetSelectedTypes(
+      String dbName, String colName, Map<String, _FieldInfo> fieldsMap) {
+    if (_selectedFields.isEmpty) return;
+
+    setState(() {
+      for (final key in _selectedFields) {
+        final customKey = '${dbName}_${colName}_$key';
+        _customTypes.remove(customKey);
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            "${_selectedFields.length} alanın tipi varsayılana sıfırlandı."),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Şemayı Kod Olarak Dışa Aktarma Diyaloğu
+  // ════════════════════════════════════════════════════════════════════════
+
+  void _showExportCodeDialog(
+      String dbName, String colName, Map<String, _FieldInfo> fieldsMap) {
+    final className = colName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final capitalizedName = className.isEmpty
+        ? 'Model'
+        : className[0].toUpperCase() + className.substring(1);
+
+    // 1. Dart Sınıfı
+    final dartBuffer = StringBuffer();
+    dartBuffer.writeln('class $capitalizedName {');
+    fieldsMap.forEach((key, info) {
+      final customKey = '${dbName}_${colName}_$key';
+      final type = _customTypes[customKey] ?? info.inferredType;
+      final dartType = _mapToDartType(type);
+      dartBuffer.writeln('  final $dartType $key;');
+    });
+    dartBuffer.writeln('\n  const $capitalizedName({');
+    fieldsMap.forEach((key, _) {
+      dartBuffer.writeln('    required this.$key,');
+    });
+    dartBuffer.writeln('  });\n}');
+
+    // 2. TypeScript Interface
+    final tsBuffer = StringBuffer();
+    tsBuffer.writeln('interface $capitalizedName {');
+    fieldsMap.forEach((key, info) {
+      final customKey = '${dbName}_${colName}_$key';
+      final type = _customTypes[customKey] ?? info.inferredType;
+      final tsType = _mapToTsType(type);
+      tsBuffer.writeln('  $key: $tsType;');
+    });
+    tsBuffer.writeln('}');
+
+    // 3. JSON Schema
+    final jsonSchemaMap = <String, dynamic>{
+      '\$schema': 'http://json-schema.org/draft-07/schema#',
+      'title': capitalizedName,
+      'type': 'object',
+      'properties': <String, dynamic>{},
+    };
+    fieldsMap.forEach((key, info) {
+      final customKey = '${dbName}_${colName}_$key';
+      final type = _customTypes[customKey] ?? info.inferredType;
+      jsonSchemaMap['properties'][key] = {'type': type.toLowerCase()};
+    });
+    final jsonSchemaText =
+        const JsonEncoder.withIndent('  ').convert(jsonSchemaMap);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return DefaultTabController(
+          length: 3,
+          child: AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.code, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text('$colName Şemasını Aktar'),
+              ],
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600, maxHeight: 450),
+              child: Column(
+                children: [
+                  const TabBar(
+                    tabs: [
+                      Tab(text: 'Dart Class'),
+                      Tab(text: 'TypeScript'),
+                      Tab(text: 'JSON Schema'),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildCodeSnippet(dartBuffer.toString()),
+                        _buildCodeSnippet(tsBuffer.toString()),
+                        _buildCodeSnippet(jsonSchemaText),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Kapat'),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCodeSnippet(String code) {
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                code,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Color(0xFF38BDF8),
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: code));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Kod panoya kopyalandı!')),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Panoya Kopyala'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _mapToDartType(String type) {
+    switch (type) {
+      case 'Integer':
+        return 'int';
+      case 'Double':
+        return 'double';
+      case 'Boolean':
+        return 'bool';
+      case 'DateTime':
+        return 'DateTime';
+      case 'Array':
+        return 'List<dynamic>';
+      case 'Object':
+        return 'Map<String, dynamic>';
+      default:
+        return 'String';
+    }
+  }
+
+  String _mapToTsType(String type) {
+    switch (type) {
+      case 'Integer':
+      case 'Double':
+        return 'number';
+      case 'Boolean':
+        return 'boolean';
+      case 'DateTime':
+        return 'Date | string';
+      case 'Array':
+        return 'any[]';
+      case 'Object':
+        return 'Record<string, any>';
+      default:
+        return 'string';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Özet İstatistik Kartı
+  // ════════════════════════════════════════════════════════════════════════
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required bool isDark,
+    required double width,
+  }) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : AppColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -487,11 +1158,16 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 48, color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+          Icon(icon,
+              size: 48,
+              color: isDark
+                  ? const Color(0xFF475569)
+                  : const Color(0xFFCBD5E1)),
           const SizedBox(height: 16),
           Text(
             title,
@@ -499,7 +1175,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+              color: isDark
+                  ? const Color(0xFF94A3B8)
+                  : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -508,7 +1186,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+              color: isDark
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFF94A3B8),
             ),
           ),
         ],
@@ -520,7 +1200,15 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   //  Yardımcılar
   // ════════════════════════════════════════════════════════════════════════
 
-  static const _typeOptions = ['String', 'Integer', 'Double', 'Boolean', 'DateTime', 'Array', 'Object'];
+  static const _typeOptions = [
+    'String',
+    'Integer',
+    'Double',
+    'Boolean',
+    'DateTime',
+    'Array',
+    'Object'
+  ];
 
   String _validTypeValue(String type) {
     return _typeOptions.contains(type) ? type : 'String';
@@ -532,7 +1220,10 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     if (val is bool) return 'Boolean';
     if (val is List) return 'Array';
     if (val is Map) return 'Object';
-    if (val != null && DateTime.tryParse(val.toString()) != null) return 'DateTime';
+    if (val != null &&
+        DateTime.tryParse(val.toString()) != null &&
+        val.toString().contains('-') &&
+        val.toString().length >= 10) return 'DateTime';
     return 'String';
   }
 
@@ -620,12 +1311,12 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
       if (creds != null) {
         try {
           await ref.read(socketServiceProvider).send(
-            action: 'CREATE_COLLECTION',
-            username: creds.username,
-            password: creds.password,
-            database: dbName,
-            collection: name,
-          );
+                action: 'CREATE_COLLECTION',
+                username: creds.username,
+                password: creds.password,
+                database: dbName,
+                collection: name,
+              );
         } catch (_) {}
       }
 
@@ -647,18 +1338,12 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════
-//  Yardımcı Modeller
-// ════════════════════════════════════════════════════════════════════════
-
 class _FieldInfo {
   final String inferredType;
-  final dynamic sampleValue;
   int sampleCount;
 
   _FieldInfo({
     required this.inferredType,
-    this.sampleValue,
     this.sampleCount = 1,
   });
 }
