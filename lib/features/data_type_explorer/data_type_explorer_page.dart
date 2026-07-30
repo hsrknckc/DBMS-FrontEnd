@@ -73,7 +73,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   @override
   Widget build(BuildContext context) {
     final schemaAsync = _selectedDatabaseId != null && _selectedCollection != null ? ref.watch(collectionSchemaProvider('${_selectedDatabaseId}::$_selectedCollection')) : const AsyncValue.data(<String, SchemaField>{});
-    final customTypes = schemaAsync.valueOrNull ?? {};
+    final customTypes = schemaAsync.valueOrNull ?? <String, SchemaField>{};
     final dbsAsync = ref.watch(databasesProvider);
     final rawDatabases = dbsAsync.valueOrNull ?? [];
     final theme = Theme.of(context);

@@ -23,19 +23,19 @@ final collectionSchemaProvider = FutureProvider.family<Map<String, SchemaField>,
 String typeToLabel(String type) {
   switch (type.toLowerCase()) {
     case 'string':
-      return 'Metin';
+      return 'String';
     case 'int':
-      return 'Tam Sayı';
+      return 'Integer';
     case 'double':
-      return 'Ondalık';
+      return 'Double';
     case 'boolean':
-      return 'Doğru-Yanlış';
+      return 'Boolean';
     case 'array':
-      return 'Dizi';
+      return 'Array';
     case 'object':
-      return 'Nesne';
+      return 'Object';
     case 'any':
-      return 'Herhangi';
+      return 'Any';
     default:
       return type;
   }
@@ -44,19 +44,19 @@ String typeToLabel(String type) {
 /// Kullanıcı dostu etiketi backend tip adına çevirir.
 String labelToType(String label) {
   switch (label) {
-    case 'Metin':
+    case 'String':
       return 'string';
-    case 'Tam Sayı':
+    case 'Integer':
       return 'int';
-    case 'Ondalık':
+    case 'Double':
       return 'double';
-    case 'Doğru-Yanlış':
+    case 'Boolean':
       return 'boolean';
-    case 'Dizi':
+    case 'Array':
       return 'array';
-    case 'Nesne':
+    case 'Object':
       return 'object';
-    case 'Herhangi':
+    case 'Any':
       return 'any';
     default:
       return label.toLowerCase();
@@ -83,11 +83,11 @@ dynamic convertValueToSchemaType(String text, String type) {
 
 /// Kullanıcı arayüzünde gösterilebilecek tüm tip etiketleri.
 const List<String> allTypeLabels = [
-  'Metin',
-  'Tam Sayı',
-  'Ondalık',
-  'Doğru-Yanlış',
-  'Dizi',
-  'Nesne',
-  'Herhangi',
+  'String',
+  'Integer',
+  'Double',
+  'Boolean',
+  'Array',
+  'Object',
+  'Any',
 ];

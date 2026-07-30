@@ -655,12 +655,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                   ),
                 ),
               ),
-              if (_canImport)
-                OutlinedButton.icon(
-                  onPressed: _pickAndImportJson,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('İçe Aktar'),
-                ),
+
             ],
           );
 
