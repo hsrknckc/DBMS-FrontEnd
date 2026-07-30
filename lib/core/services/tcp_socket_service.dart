@@ -184,9 +184,9 @@ class TcpSocketService {
       Completer<DbResponse>? completer;
       if (_pendingRequests.containsKey(response.requestId)) {
         completer = _pendingRequests.remove(response.requestId);
-      } else if (_pendingRequests.isNotEmpty) {
-        final firstKey = _pendingRequests.keys.first;
-        completer = _pendingRequests.remove(firstKey);
+      } else {
+        print('[TcpSocketService] Uyarı: Eşleşmeyen veya süresi dolmuş requestId: ${response.requestId}');
+        return;
       }
 
       if (completer != null && !completer.isCompleted) {
@@ -194,17 +194,7 @@ class TcpSocketService {
       }
     } catch (e) {
       print('[TcpSocketService] Yanıt ayrıştırma hatası: $e | Ham Satır: $line');
-      if (_pendingRequests.isNotEmpty) {
-        final firstKey = _pendingRequests.keys.first;
-        final completer = _pendingRequests.remove(firstKey);
-        if (completer != null && !completer.isCompleted) {
-          completer.complete(DbResponse(
-            requestId: firstKey,
-            status: 'OK',
-            data: [line],
-          ));
-        }
-      }
+      // Ayrıştırılamayan veri çöpe atılır. İlgili istek timeout'a düşecektir.
     }
   }
 

@@ -116,7 +116,7 @@ class TcpAuthRepository implements AuthRepository {
   // ── Yardımcı ──────────────────────────────────────────────────────────
 
   AppUser _parseUser(Map<String, dynamic> data) {
-    final roleStr = data['role'] as String? ?? 'superAdmin';
+    final roleStr = data['role'] as String? ?? 'user';
     final role = roleStr == 'superAdmin'
         ? UserRole.superAdmin
         : UserRole.user;
@@ -124,7 +124,7 @@ class TcpAuthRepository implements AuthRepository {
     final permList =
         (data['permissions'] as List<dynamic>? ?? []).cast<String>();
     final permissions = permList.isEmpty
-        ? Permission.values.toSet()
+        ? <Permission>{}
         : permList
             .map((p) => Permission.values.firstWhere(
                   (e) => e.name == p,

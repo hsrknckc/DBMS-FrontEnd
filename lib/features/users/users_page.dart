@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/permission.dart';
+import 'controllers/users_notifier.dart';
 
-class UsersPage extends StatefulWidget {
+class UsersPage extends ConsumerStatefulWidget {
   const UsersPage({super.key});
 
   @override
-  State<UsersPage> createState() => _UsersPageState();
+  ConsumerState<UsersPage> createState() => _UsersPageState();
 }
 
-class _UsersPageState extends State<UsersPage> {
+class _UsersPageState extends ConsumerState<UsersPage> {
   final TextEditingController _searchController = TextEditingController();
 
   /// 0: Tümü
@@ -20,76 +23,9 @@ class _UsersPageState extends State<UsersPage> {
   /// 3: Silinenler
   int _statusFilter = 0;
 
-  final List<AppUser> _users = [
-    AppUser(
-      id: 'user-1',
-      name: 'Mehmet Kaya',
-      email: 'mehmet.kaya@company.com',
-      role: UserRole.user,
-      departments: const {'Sensor', 'Signal'},
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-        Permission.dataExport,
-      },
-      isActive: true,
-      lastLoginAt: DateTime(2026, 7, 15, 8, 45),
-      lastLogoutAt: DateTime(2026, 7, 14, 17, 20),
-    ),
-    AppUser(
-      id: 'user-2',
-      name: 'Zeynep Demir',
-      email: 'zeynep.demir@company.com',
-      role: UserRole.user,
-      departments: const {'Acoustic'},
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-        Permission.dataCreate,
-        Permission.dataUpdate,
-      },
-      isActive: true,
-      lastLoginAt: DateTime(2026, 7, 15, 9, 10),
-      lastLogoutAt: DateTime(2026, 7, 14, 18, 5),
-    ),
-    AppUser(
-      id: 'user-3',
-      name: 'Ahmet Yıldız',
-      email: 'ahmet.yildiz@company.com',
-      role: UserRole.user,
-      departments: const {'Signal'},
-      permissions: const {Permission.databaseView, Permission.dataView},
-      isActive: false,
-      lastLoginAt: DateTime(2026, 7, 8, 10, 30),
-      lastLogoutAt: DateTime(2026, 7, 8, 16, 55),
-    ),
-    const AppUser(
-      id: 'user-4',
-      name: 'Elif Arslan',
-      email: 'elif.arslan@company.com',
-      role: UserRole.user,
-      departments: {'Sensor', 'Acoustic'},
-      permissions: {
-        Permission.databaseView,
-        Permission.dataView,
-        Permission.dataExport,
-      },
-      isActive: true,
-      mustChangePassword: true,
-    ),
-    AppUser(
-      id: 'user-5',
-      name: 'Burak Çetin',
-      email: 'burak.cetin@company.com',
-      role: UserRole.user,
-      departments: const {'Sonar'},
-      permissions: const {Permission.databaseView, Permission.dataView},
-      isActive: false,
-      isDeleted: true,
-      deletedAt: DateTime(2026, 7, 13, 15, 30),
-      deletedBy: 'super-admin-1',
-    ),
-  ];
+  List<AppUser> get _users {
+    return ref.watch(usersProvider).valueOrNull ?? [];
+  }
 
   List<AppUser> get _filteredUsers {
     final query = _searchController.text.trim().toLowerCase();
@@ -932,7 +868,7 @@ class _UsersPageState extends State<UsersPage> {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
 
-    final result = await showDialog<AppUser>(
+    await showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -976,7 +912,7 @@ class _UsersPageState extends State<UsersPage> {
               child: const Text('İptal'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final name = nameController.text.trim();
                 final email = emailController.text.trim();
 
@@ -984,18 +920,25 @@ class _UsersPageState extends State<UsersPage> {
                   return;
                 }
 
-                Navigator.of(dialogContext).pop(
-                  AppUser(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: name,
-                    email: email,
-                    role: UserRole.user,
-                    departments: const {},
-                    permissions: const {},
-                    isActive: true,
-                    mustChangePassword: true,
-                  ),
-                );
+                try {
+                  await ref.read(usersProvider.notifier).createUser(
+                        name: name,
+                        email: email,
+                        password: 'TemporaryPassword123!', // Sunucu tarafında değiştirilmesi gerekebilir
+                      );
+                  if (mounted) {
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Kullanıcı başarıyla eklendi.'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Hata: $e'), backgroundColor: AppColors.danger),
+                    );
+                  }
+                }
               },
               child: const Text('Kullanıcı Ekle'),
             ),
@@ -1006,14 +949,6 @@ class _UsersPageState extends State<UsersPage> {
 
     nameController.dispose();
     emailController.dispose();
-
-    if (result == null) {
-      return;
-    }
-
-    setState(() {
-      _users.add(result);
-    });
   }
 
   Future<void> _showEditUserDialog(AppUser user) async {

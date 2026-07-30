@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/permission.dart';
+import '../users/controllers/users_notifier.dart';
 
-class PermissionsPage extends StatefulWidget {
+class PermissionsPage extends ConsumerStatefulWidget {
   const PermissionsPage({super.key});
 
   @override
-  State<PermissionsPage> createState() => _PermissionsPageState();
+  ConsumerState<PermissionsPage> createState() => _PermissionsPageState();
 }
 
-class _PermissionsPageState extends State<PermissionsPage> {
+class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   static const List<String> _availableDepartments = [
     'Sensor',
     'Signal',
@@ -44,104 +47,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
 
   final TextEditingController _userSearchController = TextEditingController();
 
-  final List<AppUser> _users = [
-    AppUser(
-      id: 'user-1',
-      name: 'Mehmet Kaya',
-      email: 'mehmet.kaya@company.com',
-      role: UserRole.user,
-      departments: const {'Sensor', 'Signal'},
-      permissions: const {},
-      databasePermissions: const {
-        'Sensor': {Permission.databaseView},
-        'Signal': {Permission.databaseView, Permission.databaseCreate},
-      },
-      collectionPermissions: const {
-        'sensor_readings': {Permission.dataView, Permission.dataExport},
-        'sensor_status': {Permission.dataView},
-        'signal_records': {Permission.dataView, Permission.dataCreate},
-      },
-      isActive: true,
-      lastLoginAt: DateTime(2026, 7, 15, 8, 45),
-      lastLogoutAt: DateTime(2026, 7, 14, 17, 20),
-    ),
-    AppUser(
-      id: 'user-2',
-      name: 'Zeynep Demir',
-      email: 'zeynep.demir@company.com',
-      role: UserRole.user,
-      departments: const {'Acoustic'},
-      permissions: const {},
-      databasePermissions: const {
-        'Acoustic': {Permission.databaseView, Permission.databaseCreate},
-      },
-      collectionPermissions: const {
-        'acoustic_logs': {
-          Permission.dataView,
-          Permission.dataCreate,
-          Permission.dataUpdate,
-        },
-        'acoustic_data': {Permission.dataView},
-      },
-      isActive: true,
-      lastLoginAt: DateTime(2026, 7, 15, 9, 10),
-      lastLogoutAt: DateTime(2026, 7, 14, 18, 5),
-    ),
-    AppUser(
-      id: 'user-3',
-      name: 'Ahmet Yıldız',
-      email: 'ahmet.yildiz@company.com',
-      role: UserRole.user,
-      departments: const {'Signal'},
-      permissions: const {},
-      databasePermissions: const {
-        'Signal': {Permission.databaseView},
-      },
-      collectionPermissions: const {
-        'signal_records': {Permission.dataView},
-      },
-      isActive: false,
-      lastLoginAt: DateTime(2026, 7, 8, 10, 30),
-      lastLogoutAt: DateTime(2026, 7, 8, 16, 55),
-    ),
-    const AppUser(
-      id: 'user-4',
-      name: 'Elif Arslan',
-      email: 'elif.arslan@company.com',
-      role: UserRole.user,
-      departments: {'Sensor', 'Acoustic'},
-      permissions: {},
-      databasePermissions: {
-        'Sensor': {Permission.databaseView},
-        'Acoustic': {Permission.databaseView},
-      },
-      collectionPermissions: {
-        'sensor_readings': {Permission.dataView, Permission.dataExport},
-        'acoustic_logs': {Permission.dataView},
-      },
-      isActive: true,
-      mustChangePassword: true,
-    ),
-    AppUser(
-      id: 'user-5',
-      name: 'Burak Çetin',
-      email: 'burak.cetin@company.com',
-      role: UserRole.user,
-      departments: const {'Sonar'},
-      permissions: const {},
-      databasePermissions: const {
-        'Sonar': {Permission.databaseView},
-      },
-      collectionPermissions: const {
-        'sonar_ping_logs': {Permission.dataView},
-      },
-      isActive: false,
-      isDeleted: true,
-      deletedAt: DateTime(2026, 7, 13, 15, 30),
-      deletedBy: 'super-admin-1',
-    ),
-  ];
-
   String? _selectedUserId;
   String? _activeDepartmentTab;
 
@@ -155,6 +60,10 @@ class _PermissionsPageState extends State<PermissionsPage> {
   final Map<String, Set<Permission>> _selectedCollectionPermissions = {};
 
   bool _hasUnsavedChanges = false;
+
+  List<AppUser> get _users {
+    return ref.watch(usersProvider).valueOrNull ?? [];
+  }
 
   List<AppUser> get _availableUsers {
     return _users.where((user) => !user.isDeleted).toList();
@@ -329,10 +238,13 @@ class _PermissionsPageState extends State<PermissionsPage> {
     });
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
     final selectedUser = _selectedUser;
     if (selectedUser == null) return;
-    final index = _users.indexWhere((user) => user.id == selectedUser.id);
+    
+    // Aslında ref.watch(usersProvider) ile kullanıcıları almalıyız
+    final users = ref.read(usersProvider).valueOrNull ?? [];
+    final index = users.indexWhere((user) => user.id == selectedUser.id);
     if (index == -1) return;
 
     // allowedCollections = seçilen koleksiyonlar
@@ -341,27 +253,38 @@ class _PermissionsPageState extends State<PermissionsPage> {
       newAllowedCollections[dept] = List.from(cols);
     });
 
-    setState(() {
-      _users[index] = selectedUser.copyWith(
-        departments: Set<String>.from(_selectedDepartments),
-        allowedCollections: newAllowedCollections,
-        databasePermissions: Map<String, Set<Permission>>.fromEntries(
-          _selectedDatabasePermissions.entries.map(
-            (e) => MapEntry(e.key, Set<Permission>.from(e.value)),
-          ),
+    final updatedUser = selectedUser.copyWith(
+      departments: Set<String>.from(_selectedDepartments),
+      allowedCollections: newAllowedCollections,
+      databasePermissions: Map<String, Set<Permission>>.fromEntries(
+        _selectedDatabasePermissions.entries.map(
+          (e) => MapEntry(e.key, Set<Permission>.from(e.value)),
         ),
-        collectionPermissions: Map<String, Set<Permission>>.fromEntries(
-          _selectedCollectionPermissions.entries.map(
-            (e) => MapEntry(e.key, Set<Permission>.from(e.value)),
-          ),
+      ),
+      collectionPermissions: Map<String, Set<Permission>>.fromEntries(
+        _selectedCollectionPermissions.entries.map(
+          (e) => MapEntry(e.key, Set<Permission>.from(e.value)),
         ),
-      );
-      _hasUnsavedChanges = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${selectedUser.name} için yetkiler kaydedildi.')),
+      ),
     );
+
+    try {
+      await ref.read(usersProvider.notifier).updateUser(updatedUser);
+      if (mounted) {
+        setState(() {
+          _hasUnsavedChanges = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${selectedUser.name} için yetkiler kaydedildi.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata oluştu: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
   }
 
   void _cancelChanges() {

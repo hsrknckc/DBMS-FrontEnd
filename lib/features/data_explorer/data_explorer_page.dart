@@ -655,6 +655,12 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                   ),
                 ),
               ),
+              if (_canImport)
+                OutlinedButton.icon(
+                  onPressed: _pickAndImportJson,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('İçe Aktar'),
+                ),
             ],
           );
 
@@ -2294,7 +2300,7 @@ if ($d.ShowDialog() -eq 'OK') { Write-Output $d.FileName }
               .catchError((_) => <String, dynamic>{});
           await tcpRepo
               .send(
-                action: 'DELETE_COLLECTION',
+                action: 'DROP_COLLECTION',
                 username: creds.username,
                 password: creds.password,
                 database: currentDb.name,
