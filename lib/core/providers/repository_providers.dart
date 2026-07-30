@@ -19,6 +19,9 @@ import '../../repositories/audit_log/tcp_audit_log_repository.dart';
 import '../../repositories/dashboard/dashboard_repository.dart';
 import '../../repositories/dashboard/tcp_dashboard_repository.dart';
 
+import '../../repositories/schema/schema_repository.dart';
+import '../../repositories/schema/tcp_schema_repository.dart';
+
 import 'socket_provider.dart';
 
 export 'socket_provider.dart';
@@ -103,3 +106,14 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
     () => creds,
   );
 });
+
+// ── Schema ────────────────────────────────────────────────────────────────────
+
+final schemaRepositoryProvider = Provider<SchemaRepository>((ref) {
+  final creds = ref.watch(credentialsProvider);
+  return TcpSchemaRepository(
+    ref.read(tcpSocketServiceProvider),
+    () => creds,
+  );
+});
+

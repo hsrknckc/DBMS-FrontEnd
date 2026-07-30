@@ -1260,87 +1260,23 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     }
   }
 
-  Map<String, RecordFieldType> _inferCollectionTypes() {
-    final types = <String, RecordFieldType>{};
-    final schema = ref.read(schemaProvider);
+  Future<Map<String, SchemaField>> _getCollectionSchema() async {
+    final types = <String, SchemaField>{};
+    if (_selectedDatabaseId == null || _selectedCollection == null) return types;
     
-    final dbsAsync = ref.read(databasesProvider);
-    final rawDatabases = dbsAsync.valueOrNull ?? [];
-    String actualDbName = _selectedDatabaseId ?? '';
-    if (actualDbName.isNotEmpty) {
-      try {
-        final db = rawDatabases.firstWhere((d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId);
-        actualDbName = db.name.isNotEmpty ? db.name : db.id;
-      } catch (_) {}
-    }
-    final colName = _selectedCollection ?? '';
-
-    for (var r in _filteredRecords) {
-      for (var entry in r.data.entries) {
-        final key = entry.key;
-        final val = entry.value;
-        
-        final customKey = '${actualDbName}_${colName}_$key';
-        final customTypeStr = schema[customKey];
-        if (customTypeStr != null) {
-           types[key] = _mapStringToRecordFieldType(customTypeStr);
-           continue;
-        }
-
-        if (val != null && !types.containsKey(key)) {
-          if (val is bool) {
-            types[key] = RecordFieldType.boolean;
-          } else if (val is int) {
-            types[key] = RecordFieldType.integer;
-          } else if (val is double) {
-            types[key] = RecordFieldType.double;
-          } else if (val is List) {
-            types[key] = RecordFieldType.array;
-          } else if (val is Map) {
-            types[key] = RecordFieldType.object;
-          } else if (DateTime.tryParse(val.toString()) != null &&
-              val.toString().contains('-') &&
-              val.toString().length >= 10) {
-            types[key] = RecordFieldType.dateTime;
-          } else {
-            types[key] = RecordFieldType.string;
-          }
-        }
-      }
-    }
-    
-    final allKeys = <String>{};
-    for (var r in _filteredRecords) {
-      allKeys.addAll(r.data.keys);
-    }
-    
-    final prefix = '${actualDbName}_${colName}_';
-    for (final sk in schema.keys) {
-      if (sk.startsWith(prefix)) {
-        allKeys.add(sk.substring(prefix.length));
-      }
-    }
-
-    for (var key in allKeys) {
-      if (!types.containsKey(key)) {
-        final customKey = '${actualDbName}_${colName}_$key';
-        final customTypeStr = schema[customKey];
-        if (customTypeStr != null) {
-           types[key] = _mapStringToRecordFieldType(customTypeStr);
-        } else {
-           types[key] = RecordFieldType.string;
-        }
-      }
-    }
+    try {
+      final schemaMap = await ref.read(collectionSchemaProvider('${_selectedDatabaseId}::$_selectedCollection').future);
+      return schemaMap;
+    } catch (_) {}
     
     return types;
   }
 
   Future<void> _showCreateRecordDialog() async {
-    final schemaTypes = _inferCollectionTypes();
+    final schemaTypes = await _getCollectionSchema();
     final initialData = <String, dynamic>{};
     for (var key in schemaTypes.keys) {
-      initialData[key] = null; // Start empty
+      initialData[key] = null; // Başlangıçta boş değer
     }
 
     if (initialData.isEmpty) {
@@ -1369,13 +1305,16 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppColors.danger,
+        ));
       }
     }
   }
 
   Future<void> _showEditRecordDialog(DataRecord record) async {
-    final schemaTypes = _inferCollectionTypes();
+    final schemaTypes = await _getCollectionSchema();
     final allData = <String, dynamic>{};
     for (var key in schemaTypes.keys) {
       allData[key] = record.data[key];
@@ -1410,7 +1349,10 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppColors.danger,
+        ));
       }
     }
   }
@@ -1419,7 +1361,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     required String title,
     required Map<String, dynamic> initialData,
     required String saveButtonText,
-    Map<String, RecordFieldType>? schemaTypes,
+    Map<String, SchemaField>? schemaTypes,
   }) {
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -1429,56 +1371,51 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
 
         final formData = Map<String, dynamic>.from(initialData);
         final controllers = <String, TextEditingController>{};
-        final types = <String, RecordFieldType>{};
+        final types = <String, String>{};
 
         void initField(String key, dynamic val) {
-          final inferredType = schemaTypes?[key];
+          final inferredField = schemaTypes?[key];
+          final backendType = inferredField?.type;
 
-          if (inferredType != null) {
-            types[key] = inferredType;
+          if (backendType != null) {
+            types[key] = backendType;
             if (val == null) {
-              if (inferredType == RecordFieldType.boolean) {
+              if (backendType == 'boolean') {
                 controllers[key] = TextEditingController(text: 'null');
               } else {
                 controllers[key] = TextEditingController(text: '');
               }
-            } else if (inferredType == RecordFieldType.boolean) {
+            } else if (backendType == 'boolean') {
               controllers[key] = TextEditingController(text: val.toString());
-            } else if (inferredType == RecordFieldType.array || inferredType == RecordFieldType.object) {
+            } else if (backendType == 'array' || backendType == 'object') {
               controllers[key] = TextEditingController(text: (val is List || val is Map) ? jsonEncode(val) : val.toString());
             } else {
               controllers[key] = TextEditingController(text: val.toString());
             }
           } else {
             if (val == null) {
-              types[key] = RecordFieldType.string;
+              types[key] = 'string';
               controllers[key] = TextEditingController(text: '');
             } else if (val is bool) {
-              types[key] = RecordFieldType.boolean;
+              types[key] = 'boolean';
               controllers[key] = TextEditingController(text: val.toString());
             } else if (val is int) {
-              types[key] = RecordFieldType.integer;
+              types[key] = 'int';
               controllers[key] = TextEditingController(text: val.toString());
             } else if (val is double) {
-              types[key] = RecordFieldType.double;
+              types[key] = 'double';
               controllers[key] = TextEditingController(text: val.toString());
             } else if (val is num) {
-              types[key] = RecordFieldType.integer;
+              types[key] = 'int';
               controllers[key] = TextEditingController(text: val.toString());
             } else if (val is List) {
-              types[key] = RecordFieldType.array;
+              types[key] = 'array';
               controllers[key] = TextEditingController(text: jsonEncode(val));
             } else if (val is Map) {
-              types[key] = RecordFieldType.object;
+              types[key] = 'object';
               controllers[key] = TextEditingController(text: jsonEncode(val));
-            } else if (val != null &&
-                DateTime.tryParse(val.toString()) != null &&
-                val.toString().contains('-') &&
-                val.toString().length >= 10) {
-              types[key] = RecordFieldType.dateTime;
-              controllers[key] = TextEditingController(text: val.toString());
             } else {
-              types[key] = RecordFieldType.string;
+              types[key] = 'string';
               controllers[key] = TextEditingController(text: val.toString());
             }
           }
@@ -1498,33 +1435,21 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
           builder: (context, setDialogState) {
             void syncToJson() {
               for (var key in controllers.keys) {
-                final type = types[key]!;
+                final type = types[key] ?? 'string';
                 final text = controllers[key]!.text.trim();
 
-                if (text.isEmpty && type != RecordFieldType.boolean) {
+                if (text.isEmpty && type != 'boolean') {
                   formData[key] = null;
-                } else if (type == RecordFieldType.boolean) {
-                  if (text == 'null') {
-                    formData[key] = null;
-                  } else {
-                    formData[key] = (text == 'true');
-                  }
-                } else if (type == RecordFieldType.integer) {
-                  formData[key] =
-                      int.tryParse(text) ?? num.tryParse(text)?.toInt();
-                } else if (type == RecordFieldType.double) {
-                  formData[key] = double.tryParse(text);
-                } else if (type == RecordFieldType.dateTime) {
-                  formData[key] = text;
-                } else if (type == RecordFieldType.array ||
-                    type == RecordFieldType.object) {
+                } else if (type == 'boolean' && text == 'null') {
+                  formData[key] = null;
+                } else if (type == 'array' || type == 'object') {
                   try {
                     formData[key] = jsonDecode(text);
                   } catch (_) {
                     formData[key] = text;
                   }
                 } else {
-                  formData[key] = text;
+                  formData[key] = convertValueToSchemaType(text, type);
                 }
               }
               jsonController.text = const JsonEncoder.withIndent(

@@ -14,6 +14,7 @@ import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
 import '../data_explorer/controllers/data_explorer_notifier.dart';
 import '../../core/providers/schema_provider.dart';
+import '../../repositories/schema/schema_repository.dart';
 
 class DataTypeExplorerPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
@@ -71,7 +72,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final customTypes = ref.watch(schemaProvider);
+    final schemaAsync = _selectedDatabaseId != null && _selectedCollection != null ? ref.watch(collectionSchemaProvider('${_selectedDatabaseId}::$_selectedCollection')) : const AsyncValue.data(<String, SchemaField>{});
+    final customTypes = schemaAsync.valueOrNull ?? {};
     final dbsAsync = ref.watch(databasesProvider);
     final rawDatabases = dbsAsync.valueOrNull ?? [];
     final theme = Theme.of(context);
@@ -282,7 +284,44 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   //  Ana İçerik: Koleksiyon Seçimi + Şema Görünümü
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildMainContent(DatabaseItem selectedDb, bool isDark, Map<String, String> customTypes) {
+  Future<void> _updateSchemaFields(String dbName, String colName, Map<String, String> newTypes) async {
+    final schemaRepo = ref.read(schemaRepositoryProvider);
+    final currentSchema = await ref.read(collectionSchemaProvider('${dbName}::${colName}').future);
+    
+    final updatedFields = Map<String, SchemaField>.from(currentSchema);
+    
+    newTypes.forEach((key, val) {
+      if (val == 'DELETE') {
+        updatedFields.remove(key);
+      } else {
+        updatedFields[key] = SchemaField(name: key, type: labelToType(val), inferred: false);
+      }
+    });
+
+    final fieldsList = updatedFields.values.map((e) => {
+      'name': e.name,
+      'type': e.type,
+    }).toList();
+
+    try {
+      setState(() { _isSavingToDb = true; });
+      await schemaRepo.saveCollectionSchema(
+        databaseName: dbName,
+        collectionName: colName,
+        fields: fieldsList,
+      );
+      ref.invalidate(collectionSchemaProvider('${dbName}::${colName}'));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isSavingToDb = false; });
+      }
+    }
+  }
+  Widget _buildMainContent(DatabaseItem selectedDb, bool isDark, Map<String, SchemaField> customTypes) {
     return FutureBuilder<List<String>>(
       future: ref
           .read(dataExplorerRepositoryProvider)
@@ -372,7 +411,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   //  Şema Yönetim Bölümü: İstatistikler + Arama + Toplu İşlem + Tablo
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSchemaSection(String dbName, String colName, bool isDark, Map<String, String> customTypes) {
+  Widget _buildSchemaSection(String dbName, String colName, bool isDark, Map<String, SchemaField> customTypes) {
     return FutureBuilder<List<DataRecord>>(
       future: ref
           .read(dataExplorerRepositoryProvider)
@@ -394,10 +433,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
         for (final r in records) {
           final newMap = <String, dynamic>{};
           r.data.forEach((key, val) {
-            final customKey = '${dbName}_${colName}_$key';
-            if (customTypes.containsKey(customKey)) {
-              final targetType = customTypes[customKey]!;
-              newMap[key] = _convertValueToType(val, targetType);
+            if (customTypes.containsKey(key)) {
+              final targetType = customTypes[key]!.type;
+              newMap[key] = _convertValueToType(val, typeToLabel(targetType));
             } else {
               newMap[key] = val;
             }
@@ -447,9 +485,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
         // İstatistik hesaplamaları
         int customCount = 0;
         for (final key in fieldsMap.keys) {
-          final customKey = '${dbName}_${colName}_$key';
-          if (customTypes.containsKey(customKey) &&
-              customTypes[customKey] != fieldsMap[key]!.inferredType) {
+          if (customTypes.containsKey(key) && !customTypes[key]!.inferred) {
             customCount++;
           }
         }
@@ -540,7 +576,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: () =>
-                      _showExportCodeDialog(dbName, colName, fieldsMap),
+                      _showExportCodeDialog(dbName, colName, fieldsMap, customTypes),
                   icon: const Icon(Icons.code),
                   label: const Text('Şemayı Kod Olarak Aktar'),
                   style: OutlinedButton.styleFrom(
@@ -582,6 +618,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                             colName,
                             records,
                             fieldsMap,
+                            customTypes,
                           ),
                     icon: _isSavingToDb
                         ? const SizedBox(
@@ -645,7 +682,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                     DropdownButton<String>(
                       value: _bulkTargetType,
                       underline: const SizedBox(),
-                      items: _typeOptions
+                      items: allTypeLabels
                           .map(
                             (t) => DropdownMenuItem(value: t, child: Text(t)),
                           )
@@ -818,8 +855,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                             rows: filteredEntries.map((entry) {
                               final key = entry.key;
                               final info = entry.value;
-                              final customKey = '${dbName}_${colName}_$key';
-                              final customType = customTypes[customKey];
+                              final customTypeObj = customTypes[key];
+                              final customType = customTypeObj != null ? typeToLabel(customTypeObj.type) : null;
                               final activeType =
                                   customType ?? info.inferredType;
                               final isOverridden =
@@ -914,7 +951,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                                     DropdownButton<String>(
                                       value: _validTypeValue(activeType),
                                       underline: const SizedBox(),
-                                      items: _typeOptions
+                                      items: allTypeLabels
                                           .map(
                                             (t) => DropdownMenuItem(
                                               value: t,
@@ -930,7 +967,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                                       onChanged: _canUpdateType
                                           ? (val) {
                                               if (val != null) {
-                                                ref.read(schemaProvider.notifier).setCustomType(dbName, colName, key, val);
+                                              _updateSchemaFields(dbName, colName, {key: val});
                                                 ScaffoldMessenger.of(
                                                   context,
                                                 ).showSnackBar(
@@ -1044,10 +1081,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     setState(() {
       final typesMap = <String, String>{};
       for (final key in _selectedFields) {
-        final customKey = '${dbName}_${colName}_$key';
-        typesMap[customKey] = _bulkTargetType;
+        typesMap[key] = _bulkTargetType;
       }
-      ref.read(schemaProvider.notifier).setMultipleCustomTypes(typesMap);
+      _updateSchemaFields(dbName, colName, typesMap);
       _selectedFields.clear();
     });
 
@@ -1068,9 +1104,11 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   ) {
     if (_selectedFields.isEmpty) return;
 
+    final typesMap = <String, String>{};
     for (final key in _selectedFields) {
-      ref.read(schemaProvider.notifier).removeCustomType(dbName, colName, key);
+      typesMap[key] = 'DELETE';
     }
+    _updateSchemaFields(dbName, colName, typesMap);
     setState(() {
       _selectedFields.clear();
     });
@@ -1093,12 +1131,12 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     String colName,
     List<DataRecord> records,
     Map<String, _FieldInfo> fieldsMap,
+    Map<String, SchemaField> customTypes,
   ) async {
     final modifiedFields = <String, String>{};
-    final customTypes = ref.read(schemaProvider);
     fieldsMap.forEach((key, info) {
-      final customKey = '${dbName}_${colName}_$key';
-      final customType = customTypes[customKey];
+                              final customTypeObj = customTypes[key];
+                              final customType = customTypeObj != null ? typeToLabel(customTypeObj.type) : null;
       if (customType != null) {
         modifiedFields[key] = customType;
       }
@@ -1334,6 +1372,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     String dbName,
     String colName,
     Map<String, _FieldInfo> fieldsMap,
+    Map<String, SchemaField> customTypes,
   ) {
     final className = colName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     final capitalizedName = className.isEmpty
@@ -1344,9 +1383,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     final dartBuffer = StringBuffer();
     dartBuffer.writeln('class $capitalizedName {');
     fieldsMap.forEach((key, info) {
-      final customKey = '${dbName}_${colName}_$key';
-      final customTypes = ref.read(schemaProvider);
-      final type = customTypes[customKey] ?? info.inferredType;
+      final customTypeObj = customTypes[key];
+      final type = customTypeObj != null ? typeToLabel(customTypeObj.type) : info.inferredType;
       final dartType = _mapToDartType(type);
       dartBuffer.writeln('  final $dartType $key;');
     });
@@ -1360,9 +1398,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     final tsBuffer = StringBuffer();
     tsBuffer.writeln('interface $capitalizedName {');
     fieldsMap.forEach((key, info) {
-      final customKey = '${dbName}_${colName}_$key';
-      final customTypes = ref.read(schemaProvider);
-      final type = customTypes[customKey] ?? info.inferredType;
+      final customTypeObj = customTypes[key];
+      final type = customTypeObj != null ? typeToLabel(customTypeObj.type) : info.inferredType;
       final tsType = _mapToTsType(type);
       tsBuffer.writeln('  $key: $tsType;');
     });
@@ -1376,9 +1413,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
       'properties': <String, dynamic>{},
     };
     fieldsMap.forEach((key, info) {
-      final customKey = '${dbName}_${colName}_$key';
-      final customTypes = ref.read(schemaProvider);
-      final type = customTypes[customKey] ?? info.inferredType;
+      final customTypeObj = customTypes[key];
+      final type = customTypeObj != null ? typeToLabel(customTypeObj.type) : info.inferredType;
       jsonSchemaMap['properties'][key] = {'type': type.toLowerCase()};
     });
     final jsonSchemaText = const JsonEncoder.withIndent(
@@ -1631,18 +1667,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   //  Yardımcılar
   // ════════════════════════════════════════════════════════════════════════
 
-  static const _typeOptions = [
-    'String',
-    'Integer',
-    'Double',
-    'Boolean',
-    'DateTime',
-    'Array',
-    'Object',
-  ];
-
   String _validTypeValue(String type) {
-    return _typeOptions.contains(type) ? type : 'String';
+    return allTypeLabels.contains(type) ? type : 'String';
   }
 
   String _inferType(dynamic val) {
@@ -1808,7 +1834,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                       labelText: 'Veri Tipi',
                       border: OutlineInputBorder(),
                     ),
-                    items: _typeOptions
+                    items: allTypeLabels
                         .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                         .toList(),
                     onChanged: (val) {
@@ -1845,7 +1871,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
 
     final featureName = keyController.text.trim();
 
-    ref.read(schemaProvider.notifier).setCustomType(dbName, colName, featureName, selectedType);
+                                              _updateSchemaFields(dbName, colName, {featureName: selectedType});
 
     setState(() {
       _isSavingToDb = true;
