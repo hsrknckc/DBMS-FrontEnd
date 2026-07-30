@@ -13,37 +13,30 @@ import '../../models/database_item.dart';
 import '../../models/permission.dart';
 import '../databases/controllers/databases_notifier.dart';
 import '../data_explorer/controllers/data_explorer_notifier.dart';
+import '../../core/providers/schema_provider.dart';
 
 class DataTypeExplorerPage extends ConsumerStatefulWidget {
   final AppUser currentUser;
 
-  const DataTypeExplorerPage({
-    super.key,
-    required this.currentUser,
-  });
+  const DataTypeExplorerPage({super.key, required this.currentUser});
 
   @override
   ConsumerState<DataTypeExplorerPage> createState() =>
       _DataTypeExplorerPageState();
 }
 
-class _DataTypeExplorerPageState
-    extends ConsumerState<DataTypeExplorerPage> {
+class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
   static String? _lastSelectedDatabaseId;
   static String? _lastSelectedCollection;
 
   String? _selectedDatabaseId;
   String? _selectedCollection;
-
-  final Map<String, String> _customTypes = {};
   final Map<String, List<String>> _extraCollections = {};
   final Set<String> _selectedFields = {};
   String _searchQuery = '';
   String _bulkTargetType = 'String';
 
   bool _isSavingToDb = false;
-  bool _isRecordLevelMode = false;
-  final Map<String, Map<String, String>> _recordCustomTypes = {};
 
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _verticalScrollController = ScrollController();
@@ -78,6 +71,7 @@ class _DataTypeExplorerPageState
 
   @override
   Widget build(BuildContext context) {
+    final customTypes = ref.watch(schemaProvider);
     final dbsAsync = ref.watch(databasesProvider);
     final rawDatabases = dbsAsync.valueOrNull ?? [];
     final theme = Theme.of(context);
@@ -107,7 +101,9 @@ class _DataTypeExplorerPageState
             Text(
               'Bu sayfayı görüntülemek için yetkiniz bulunmamaktadır.',
               style: TextStyle(
-                color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : AppColors.textSecondary,
                 fontSize: 16,
               ),
             ),
@@ -117,14 +113,13 @@ class _DataTypeExplorerPageState
     }
 
     if (_selectedDatabaseId == null && databases.isNotEmpty) {
-      _selectedDatabaseId =
-          databases.first.name.isNotEmpty ? databases.first.name : databases.first.id;
+      _selectedDatabaseId = databases.first.name.isNotEmpty
+          ? databases.first.name
+          : databases.first.id;
     }
 
     final selectedDb = databases.firstWhere(
-      (d) =>
-          d.id == _selectedDatabaseId ||
-          d.name == _selectedDatabaseId,
+      (d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId,
       orElse: () => databases.isNotEmpty
           ? databases.first
           : DatabaseItem(
@@ -190,7 +185,7 @@ class _DataTypeExplorerPageState
               isDark: isDark,
             )
           else
-            _buildMainContent(selectedDb, isDark),
+            _buildMainContent(selectedDb, isDark, customTypes),
         ],
       ),
     );
@@ -201,7 +196,10 @@ class _DataTypeExplorerPageState
   // ════════════════════════════════════════════════════════════════════════
 
   Widget _buildDatabaseSelector(
-      List<DatabaseItem> databases, DatabaseItem selectedDb, bool isDark) {
+    List<DatabaseItem> databases,
+    DatabaseItem selectedDb,
+    bool isDark,
+  ) {
     return Row(
       children: [
         Container(
@@ -226,14 +224,18 @@ class _DataTypeExplorerPageState
               const SizedBox(width: 8),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: databases.any(
-                          (d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId)
+                  value:
+                      databases.any(
+                        (d) =>
+                            d.id == _selectedDatabaseId ||
+                            d.name == _selectedDatabaseId,
+                      )
                       ? _selectedDatabaseId
                       : (databases.isNotEmpty
-                          ? (databases.first.name.isNotEmpty
-                              ? databases.first.name
-                              : databases.first.id)
-                          : null),
+                            ? (databases.first.name.isNotEmpty
+                                  ? databases.first.name
+                                  : databases.first.id)
+                            : null),
                   items: databases.map((db) {
                     final key = db.name.isNotEmpty ? db.name : db.id;
                     return DropdownMenuItem<String>(
@@ -266,10 +268,10 @@ class _DataTypeExplorerPageState
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
       ],
@@ -280,7 +282,7 @@ class _DataTypeExplorerPageState
   //  Ana İçerik: Koleksiyon Seçimi + Şema Görünümü
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildMainContent(DatabaseItem selectedDb, bool isDark) {
+  Widget _buildMainContent(DatabaseItem selectedDb, bool isDark, Map<String, String> customTypes) {
     return FutureBuilder<List<String>>(
       future: ref
           .read(dataExplorerRepositoryProvider)
@@ -296,8 +298,11 @@ class _DataTypeExplorerPageState
         }
 
         final cols = (snapshot.data ?? []).toList();
-        final dbKey = selectedDb.name.isNotEmpty ? selectedDb.name : selectedDb.id;
-        final extra = _extraCollections[dbKey] ?? _extraCollections[selectedDb.id] ?? [];
+        final dbKey = selectedDb.name.isNotEmpty
+            ? selectedDb.name
+            : selectedDb.id;
+        final extra =
+            _extraCollections[dbKey] ?? _extraCollections[selectedDb.id] ?? [];
         for (final e in extra) {
           if (!cols.contains(e)) cols.add(e);
         }
@@ -319,70 +324,44 @@ class _DataTypeExplorerPageState
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Koleksiyon chip'leri + Mod Seçici
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: cols.map((c) {
-                      final isSelected = c == _selectedCollection;
-                      return ChoiceChip(
-                        label: Text(c),
-                        selected: isSelected,
-                        selectedColor: AppColors.primary.withOpacity(0.15),
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? AppColors.primary
-                              : (isDark ? Colors.white70 : AppColors.textPrimary),
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() {
-                              _selectedCollection = c;
-                              _lastSelectedCollection = c;
-                              _selectedFields.clear();
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
+            // Koleksiyon chip'leri
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: cols.map((c) {
+                final isSelected = c == _selectedCollection;
+                return ChoiceChip(
+                  label: Text(c),
+                  selected: isSelected,
+                  selectedColor: AppColors.primary.withOpacity(0.15),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? AppColors.primary
+                        : (isDark ? Colors.white70 : AppColors.textPrimary),
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
-                ),
-                const SizedBox(width: 12),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment<bool>(
-                      value: false,
-                      icon: Icon(Icons.schema_outlined),
-                      label: Text('Genel Şema'),
-                    ),
-                    ButtonSegment<bool>(
-                      value: true,
-                      icon: Icon(Icons.badge_outlined),
-                      label: Text('Kayıt Bazlı Düzenle'),
-                    ),
-                  ],
-                  selected: {_isRecordLevelMode},
-                  onSelectionChanged: (val) {
-                    setState(() {
-                      _isRecordLevelMode = val.first;
-                    });
+                  onSelected: (sel) {
+                    if (sel) {
+                      setState(() {
+                        _selectedCollection = c;
+                        _lastSelectedCollection = c;
+                        _selectedFields.clear();
+                      });
+                    }
                   },
-                ),
-              ],
+                );
+              }).toList(),
             ),
             const SizedBox(height: 24),
             if (_selectedCollection != null)
-              _isRecordLevelMode
-                  ? _buildRecordLevelTypeEditor(
-                      selectedDb.name, _selectedCollection!, isDark)
-                  : _buildSchemaSection(
-                      selectedDb.name, _selectedCollection!, isDark),
+              _buildSchemaSection(
+                selectedDb.name,
+                _selectedCollection!,
+                isDark,
+                customTypes,
+              ),
           ],
         );
       },
@@ -393,12 +372,11 @@ class _DataTypeExplorerPageState
   //  Şema Yönetim Bölümü: İstatistikler + Arama + Toplu İşlem + Tablo
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSchemaSection(String dbName, String colName, bool isDark) {
+  Widget _buildSchemaSection(String dbName, String colName, bool isDark, Map<String, String> customTypes) {
     return FutureBuilder<List<DataRecord>>(
-      future: ref.read(dataExplorerRepositoryProvider).getRecords(
-            databaseId: dbName,
-            collectionName: colName,
-          ),
+      future: ref
+          .read(dataExplorerRepositoryProvider)
+          .getRecords(databaseId: dbName, collectionName: colName),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -410,6 +388,23 @@ class _DataTypeExplorerPageState
         }
 
         final records = snapshot.data ?? [];
+
+        // Backend'in string döndürme ihtimaline karşı frontend tarafında 
+        // atanmış şemaya göre verileri zorla dönüştür.
+        for (final r in records) {
+          final newMap = <String, dynamic>{};
+          r.data.forEach((key, val) {
+            final customKey = '${dbName}_${colName}_$key';
+            if (customTypes.containsKey(customKey)) {
+              final targetType = customTypes[customKey]!;
+              newMap[key] = _convertValueToType(val, targetType);
+            } else {
+              newMap[key] = val;
+            }
+          });
+          r.data.clear();
+          r.data.addAll(newMap);
+        }
 
         if (records.isEmpty) {
           return _buildEmptyBox(
@@ -427,6 +422,13 @@ class _DataTypeExplorerPageState
           r.data.forEach((key, val) {
             if (fieldsMap.containsKey(key)) {
               fieldsMap[key]!.sampleCount++;
+              // Eğer önceki kayıtlarda null geldiyse ve şimdi gerçek bir tip geldiyse güncelle
+              if (fieldsMap[key]!.inferredType == 'Boş (Null)') {
+                final newInfer = _inferType(val);
+                if (newInfer != 'Boş (Null)') {
+                  fieldsMap[key]!.inferredType = newInfer;
+                }
+              }
             } else {
               fieldsMap[key] = _FieldInfo(
                 inferredType: _inferType(val),
@@ -446,8 +448,8 @@ class _DataTypeExplorerPageState
         int customCount = 0;
         for (final key in fieldsMap.keys) {
           final customKey = '${dbName}_${colName}_$key';
-          if (_customTypes.containsKey(customKey) &&
-              _customTypes[customKey] != fieldsMap[key]!.inferredType) {
+          if (customTypes.containsKey(customKey) &&
+              customTypes[customKey] != fieldsMap[key]!.inferredType) {
             customCount++;
           }
         }
@@ -475,7 +477,9 @@ class _DataTypeExplorerPageState
                       icon: Icons.edit_note_outlined,
                       label: 'Özel Atanan Tip',
                       value: '$customCount',
-                      color: customCount > 0 ? Colors.amber.shade700 : Colors.blueGrey,
+                      color: customCount > 0
+                          ? Colors.amber.shade700
+                          : Colors.blueGrey,
                       isDark: isDark,
                       width: isNarrow ? constraints.maxWidth : 160,
                     ),
@@ -483,7 +487,9 @@ class _DataTypeExplorerPageState
                       icon: Icons.check_box_outlined,
                       label: 'Seçili Alan',
                       value: '${_selectedFields.length}',
-                      color: _selectedFields.isNotEmpty ? Colors.green : Colors.grey,
+                      color: _selectedFields.isNotEmpty
+                          ? Colors.green
+                          : Colors.grey,
                       isDark: isDark,
                       width: isNarrow ? constraints.maxWidth : 160,
                     ),
@@ -517,7 +523,9 @@ class _DataTypeExplorerPageState
                       prefixIcon: const Icon(Icons.search),
                       isDense: true,
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      fillColor: isDark
+                          ? const Color(0xFF1E293B)
+                          : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
@@ -531,11 +539,15 @@ class _DataTypeExplorerPageState
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
-                  onPressed: () => _showExportCodeDialog(dbName, colName, fieldsMap),
+                  onPressed: () =>
+                      _showExportCodeDialog(dbName, colName, fieldsMap),
                   icon: const Icon(Icons.code),
                   label: const Text('Şemayı Kod Olarak Aktar'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -544,26 +556,55 @@ class _DataTypeExplorerPageState
                 if (_canUpdateType) ...[
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
+                    onPressed: () => _showAddFeatureDialog(dbName, colName, records),
+                    icon: const Icon(Icons.add_box_outlined),
+                    label: const Text('Yeni Feature Ekle'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+                if (_canUpdateType) ...[
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
                     onPressed: _isSavingToDb
                         ? null
                         : () => _confirmAndSaveTypesToDatabase(
-                              dbName, colName, records, fieldsMap),
+                            dbName,
+                            colName,
+                            records,
+                            fieldsMap,
+                          ),
                     icon: _isSavingToDb
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.save_outlined),
-                    label: Text(_isSavingToDb
-                        ? 'Veritabanına Kaydediliyor...'
-                        : 'Değişiklikleri Veritabanına Kaydet'),
+                    label: Text(
+                      _isSavingToDb
+                          ? 'Veritabanına Kaydediliyor...'
+                          : 'Değişiklikleri Veritabanına Kaydet',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -578,7 +619,10 @@ class _DataTypeExplorerPageState
             if (_canUpdateType && _selectedFields.isNotEmpty)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -602,7 +646,9 @@ class _DataTypeExplorerPageState
                       value: _bulkTargetType,
                       underline: const SizedBox(),
                       items: _typeOptions
-                          .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                          .map(
+                            (t) => DropdownMenuItem(value: t, child: Text(t)),
+                          )
                           .toList(),
                       onChanged: (val) {
                         if (val != null) {
@@ -624,7 +670,8 @@ class _DataTypeExplorerPageState
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
-                      onPressed: () => _resetSelectedTypes(dbName, colName, fieldsMap),
+                      onPressed: () =>
+                          _resetSelectedTypes(dbName, colName, fieldsMap),
                       icon: const Icon(Icons.restart_alt, size: 16),
                       label: const Text('Varsayılana Dön'),
                     ),
@@ -639,7 +686,9 @@ class _DataTypeExplorerPageState
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Column(
@@ -647,24 +696,33 @@ class _DataTypeExplorerPageState
                 children: [
                   // Tablo Başlık Barı
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark
                           ? const Color(0xFF0F172A)
                           : const Color(0xFFF8FAFC),
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.schema_outlined,
-                            size: 18, color: AppColors.primary),
+                        const Icon(
+                          Icons.schema_outlined,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           '$colName — ${filteredEntries.length} alan gösteriliyor',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : AppColors.textPrimary,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -698,54 +756,80 @@ class _DataTypeExplorerPageState
                               if (_canUpdateType)
                                 DataColumn(
                                   label: Checkbox(
-                                    value: filteredEntries.isNotEmpty &&
+                                    value:
+                                        filteredEntries.isNotEmpty &&
                                         filteredEntries.every(
-                                            (e) => _selectedFields.contains(e.key)),
+                                          (e) =>
+                                              _selectedFields.contains(e.key),
+                                        ),
                                     onChanged: (val) {
                                       setState(() {
                                         if (val == true) {
                                           _selectedFields.addAll(
-                                              filteredEntries.map((e) => e.key));
+                                            filteredEntries.map((e) => e.key),
+                                          );
                                         } else {
                                           _selectedFields.removeAll(
-                                              filteredEntries.map((e) => e.key));
+                                            filteredEntries.map((e) => e.key),
+                                          );
                                         }
                                       });
                                     },
                                   ),
                                 ),
                               const DataColumn(
-                                label: Text('Alan Adı',
-                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'Alan Adı',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const DataColumn(
-                                label: Text('Otomatik Algılanan Tip',
-                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'Otomatik Algılanan Tip',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const DataColumn(
-                                label: Text('Atanan Tip (Düzenle)',
-                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'Atanan Tip (Düzenle)',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const DataColumn(
-                                label: Text('Varlık Oranı',
-                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'Varlık Oranı',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const DataColumn(
-                                label: Text('Durum',
-                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'Durum',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
+                              if (_canUpdateType)
+                                const DataColumn(
+                                  label: Text(
+                                    'Aksiyon',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                             ],
                             rows: filteredEntries.map((entry) {
                               final key = entry.key;
                               final info = entry.value;
                               final customKey = '${dbName}_${colName}_$key';
-                              final customType = _customTypes[customKey];
-                              final activeType = customType ?? info.inferredType;
-                              final isOverridden = customType != null &&
+                              final customType = customTypes[customKey];
+                              final activeType =
+                                  customType ?? info.inferredType;
+                              final isOverridden =
+                                  customType != null &&
                                   customType != info.inferredType;
 
                               final isSelected = _selectedFields.contains(key);
-                              final percent = (info.sampleCount / records.length * 100).toStringAsFixed(0);
+                              final percent =
+                                  (info.sampleCount / records.length * 100)
+                                      .toStringAsFixed(0);
 
                               return DataRow(
                                 selected: isSelected,
@@ -782,8 +866,11 @@ class _DataTypeExplorerPageState
                                     Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(_iconForType(activeType),
-                                            size: 16, color: AppColors.primary),
+                                        Icon(
+                                          _iconForType(activeType),
+                                          size: 16,
+                                          color: AppColors.primary,
+                                        ),
                                         const SizedBox(width: 8),
                                         Text(
                                           key,
@@ -800,10 +887,13 @@ class _DataTypeExplorerPageState
                                   DataCell(
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: _colorForType(info.inferredType)
-                                            .withOpacity(0.1),
+                                        color: _colorForType(
+                                          info.inferredType,
+                                        ).withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -811,7 +901,9 @@ class _DataTypeExplorerPageState
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
-                                          color: _colorForType(info.inferredType),
+                                          color: _colorForType(
+                                            info.inferredType,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -823,26 +915,32 @@ class _DataTypeExplorerPageState
                                       value: _validTypeValue(activeType),
                                       underline: const SizedBox(),
                                       items: _typeOptions
-                                          .map((t) => DropdownMenuItem(
-                                                value: t,
-                                                child: Text(t,
-                                                    style: const TextStyle(
-                                                        fontSize: 13)),
-                                              ))
+                                          .map(
+                                            (t) => DropdownMenuItem(
+                                              value: t,
+                                              child: Text(
+                                                t,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          )
                                           .toList(),
                                       onChanged: _canUpdateType
                                           ? (val) {
                                               if (val != null) {
-                                                setState(() {
-                                                  _customTypes[customKey] = val;
-                                                });
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
+                                                ref.read(schemaProvider.notifier).setCustomType(dbName, colName, key, val);
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
                                                   SnackBar(
                                                     content: Text(
-                                                        "'$key' alanının tipi '$val' olarak güncellendi."),
-                                                    duration:
-                                                        const Duration(seconds: 2),
+                                                      "'$key' alanının tipi '$val' olarak güncellendi.",
+                                                    ),
+                                                    duration: const Duration(
+                                                      seconds: 2,
+                                                    ),
                                                   ),
                                                 );
                                               }
@@ -863,7 +961,9 @@ class _DataTypeExplorerPageState
                                   DataCell(
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: isOverridden
                                             ? Colors.amber.withOpacity(0.15)
@@ -882,6 +982,15 @@ class _DataTypeExplorerPageState
                                       ),
                                     ),
                                   ),
+
+                                  if (_canUpdateType)
+                                    DataCell(
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                        tooltip: 'Alanı (Feature) Sil',
+                                        onPressed: () => _confirmDeleteFeature(dbName, colName, key, records),
+                                      ),
+                                    ),
                                 ],
                               );
                             }).toList(),
@@ -896,11 +1005,13 @@ class _DataTypeExplorerPageState
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline,
-                              size: 16,
-                              color: isDark
-                                  ? const Color(0xFF64748B)
-                                  : AppColors.textSecondary),
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: isDark
+                                ? const Color(0xFF64748B)
+                                : AppColors.textSecondary,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Veri tiplerini değiştirmek için güncelleme yetkiniz bulunmamaktadır.',
@@ -931,36 +1042,44 @@ class _DataTypeExplorerPageState
     if (_selectedFields.isEmpty) return;
 
     setState(() {
+      final typesMap = <String, String>{};
       for (final key in _selectedFields) {
         final customKey = '${dbName}_${colName}_$key';
-        _customTypes[customKey] = _bulkTargetType;
+        typesMap[customKey] = _bulkTargetType;
       }
+      ref.read(schemaProvider.notifier).setMultipleCustomTypes(typesMap);
+      _selectedFields.clear();
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-            "${_selectedFields.length} alanın tipi topluca '$_bulkTargetType' olarak güncellendi."),
+          "Seçili alanların tipi topluca '$_bulkTargetType' olarak güncellendi.",
+        ),
         backgroundColor: Colors.green,
       ),
     );
   }
 
   void _resetSelectedTypes(
-      String dbName, String colName, Map<String, _FieldInfo> fieldsMap) {
+    String dbName,
+    String colName,
+    Map<String, _FieldInfo> fieldsMap,
+  ) {
     if (_selectedFields.isEmpty) return;
 
+    for (final key in _selectedFields) {
+      ref.read(schemaProvider.notifier).removeCustomType(dbName, colName, key);
+    }
     setState(() {
-      for (final key in _selectedFields) {
-        final customKey = '${dbName}_${colName}_$key';
-        _customTypes.remove(customKey);
-      }
+      _selectedFields.clear();
     });
-
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-            "${_selectedFields.length} alanın tipi varsayılana sıfırlandı."),
+          "Seçili alanların tipi varsayılana sıfırlandı.",
+        ),
       ),
     );
   }
@@ -976,9 +1095,10 @@ class _DataTypeExplorerPageState
     Map<String, _FieldInfo> fieldsMap,
   ) async {
     final modifiedFields = <String, String>{};
+    final customTypes = ref.read(schemaProvider);
     fieldsMap.forEach((key, info) {
       final customKey = '${dbName}_${colName}_$key';
-      final customType = _customTypes[customKey];
+      final customType = customTypes[customKey];
       if (customType != null) {
         modifiedFields[key] = customType;
       }
@@ -987,7 +1107,9 @@ class _DataTypeExplorerPageState
     if (modifiedFields.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Henüz veritabanında değiştirilecek özel veri tipi atamadınız.'),
+          content: Text(
+            'Henüz veritabanında değiştirilecek özel veri tipi atamadınız.',
+          ),
         ),
       );
       return;
@@ -1016,7 +1138,10 @@ class _DataTypeExplorerPageState
                         '${e.key}: ',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      Text(e.value, style: const TextStyle(color: AppColors.primary)),
+                      Text(
+                        e.value,
+                        style: const TextStyle(color: AppColors.primary),
+                      ),
                     ],
                   ),
                 );
@@ -1024,7 +1149,10 @@ class _DataTypeExplorerPageState
               const SizedBox(height: 12),
               const Text(
                 'Bu işlem koleksiyondaki kayıtların gerçek veri türlerini değiştirecektir.',
-                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.amber),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.amber,
+                ),
               ),
             ],
           ),
@@ -1059,16 +1187,16 @@ class _DataTypeExplorerPageState
 
       int updatedCount = 0;
       for (final rec in records) {
-        final Map<String, dynamic> updatedData = Map<String, dynamic>.from(rec.data);
+        final Map<String, dynamic> updatedData = Map<String, dynamic>.from(
+          rec.data,
+        );
         bool recordChanged = false;
 
         modifiedFields.forEach((fieldKey, targetType) {
-          if (updatedData.containsKey(fieldKey)) {
-            final oldVal = updatedData[fieldKey];
-            final newVal = _convertValueToType(oldVal, targetType);
-            updatedData[fieldKey] = newVal;
-            recordChanged = true;
-          }
+          final oldVal = updatedData[fieldKey];
+          final newVal = _convertValueToType(oldVal, targetType);
+          updatedData[fieldKey] = newVal;
+          recordChanged = true;
         });
 
         if (recordChanged && creds != null) {
@@ -1078,7 +1206,7 @@ class _DataTypeExplorerPageState
             password: creds.password,
             database: dbName,
             collection: colName,
-            filter: {'_id': rec.id},
+            filter: {'id': rec.id},
             document: updatedData,
           );
           updatedCount++;
@@ -1123,15 +1251,15 @@ class _DataTypeExplorerPageState
     switch (targetType) {
       case 'Integer':
         if (val is List && val.isNotEmpty) {
-          return int.tryParse(val.first.toString()) ?? 0;
+          return int.tryParse(val.first.toString());
         }
-        return int.tryParse(strVal) ?? num.tryParse(strVal)?.toInt() ?? val;
+        return int.tryParse(strVal) ?? num.tryParse(strVal)?.toInt();
 
       case 'Double':
         if (val is List && val.isNotEmpty) {
-          return double.tryParse(val.first.toString()) ?? 0.0;
+          return double.tryParse(val.first.toString());
         }
-        return double.tryParse(strVal) ?? num.tryParse(strVal)?.toDouble() ?? val;
+        return double.tryParse(strVal) ?? num.tryParse(strVal)?.toDouble();
 
       case 'Boolean':
         final lower = strVal.toLowerCase();
@@ -1139,7 +1267,9 @@ class _DataTypeExplorerPageState
 
       case 'String':
         if (val is List) {
-          return val.map((e) => _cleanQuotesAndBrackets(e.toString())).join(', ');
+          return val
+              .map((e) => _cleanQuotesAndBrackets(e.toString()))
+              .join(', ');
         }
         if (val is Map) {
           return jsonEncode(val);
@@ -1149,7 +1279,9 @@ class _DataTypeExplorerPageState
           try {
             final decoded = jsonDecode(strVal);
             if (decoded is List) {
-              return decoded.map((e) => _cleanQuotesAndBrackets(e.toString())).join(', ');
+              return decoded
+                  .map((e) => _cleanQuotesAndBrackets(e.toString()))
+                  .join(', ');
             }
           } catch (_) {}
         }
@@ -1187,7 +1319,8 @@ class _DataTypeExplorerPageState
     if (t.startsWith('[') && t.endsWith(']')) {
       t = t.substring(1, t.length - 1).trim();
     }
-    if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    if ((t.startsWith('"') && t.endsWith('"')) ||
+        (t.startsWith("'") && t.endsWith("'"))) {
       t = t.substring(1, t.length - 1).trim();
     }
     return t;
@@ -1198,7 +1331,10 @@ class _DataTypeExplorerPageState
   // ════════════════════════════════════════════════════════════════════════
 
   void _showExportCodeDialog(
-      String dbName, String colName, Map<String, _FieldInfo> fieldsMap) {
+    String dbName,
+    String colName,
+    Map<String, _FieldInfo> fieldsMap,
+  ) {
     final className = colName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     final capitalizedName = className.isEmpty
         ? 'Model'
@@ -1209,7 +1345,8 @@ class _DataTypeExplorerPageState
     dartBuffer.writeln('class $capitalizedName {');
     fieldsMap.forEach((key, info) {
       final customKey = '${dbName}_${colName}_$key';
-      final type = _customTypes[customKey] ?? info.inferredType;
+      final customTypes = ref.read(schemaProvider);
+      final type = customTypes[customKey] ?? info.inferredType;
       final dartType = _mapToDartType(type);
       dartBuffer.writeln('  final $dartType $key;');
     });
@@ -1224,7 +1361,8 @@ class _DataTypeExplorerPageState
     tsBuffer.writeln('interface $capitalizedName {');
     fieldsMap.forEach((key, info) {
       final customKey = '${dbName}_${colName}_$key';
-      final type = _customTypes[customKey] ?? info.inferredType;
+      final customTypes = ref.read(schemaProvider);
+      final type = customTypes[customKey] ?? info.inferredType;
       final tsType = _mapToTsType(type);
       tsBuffer.writeln('  $key: $tsType;');
     });
@@ -1239,11 +1377,13 @@ class _DataTypeExplorerPageState
     };
     fieldsMap.forEach((key, info) {
       final customKey = '${dbName}_${colName}_$key';
-      final type = _customTypes[customKey] ?? info.inferredType;
+      final customTypes = ref.read(schemaProvider);
+      final type = customTypes[customKey] ?? info.inferredType;
       jsonSchemaMap['properties'][key] = {'type': type.toLowerCase()};
     });
-    final jsonSchemaText =
-        const JsonEncoder.withIndent('  ').convert(jsonSchemaMap);
+    final jsonSchemaText = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(jsonSchemaMap);
 
     showDialog<void>(
       context: context,
@@ -1453,15 +1593,16 @@ class _DataTypeExplorerPageState
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         children: [
-          Icon(icon,
-              size: 48,
-              color: isDark
-                  ? const Color(0xFF475569)
-                  : const Color(0xFFCBD5E1)),
+          Icon(
+            icon,
+            size: 48,
+            color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+          ),
           const SizedBox(height: 16),
           Text(
             title,
@@ -1469,9 +1610,7 @@ class _DataTypeExplorerPageState
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: isDark
-                  ? const Color(0xFF94A3B8)
-                  : AppColors.textSecondary,
+              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -1480,9 +1619,7 @@ class _DataTypeExplorerPageState
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: isDark
-                  ? const Color(0xFF64748B)
-                  : const Color(0xFF94A3B8),
+              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
             ),
           ),
         ],
@@ -1501,7 +1638,7 @@ class _DataTypeExplorerPageState
     'Boolean',
     'DateTime',
     'Array',
-    'Object'
+    'Object',
   ];
 
   String _validTypeValue(String type) {
@@ -1517,7 +1654,8 @@ class _DataTypeExplorerPageState
     if (val != null &&
         DateTime.tryParse(val.toString()) != null &&
         val.toString().contains('-') &&
-        val.toString().length >= 10) return 'DateTime';
+        val.toString().length >= 10)
+      return 'DateTime';
     return 'String';
   }
 
@@ -1563,406 +1701,6 @@ class _DataTypeExplorerPageState
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  Kayıt Bazlı Tip Düzenleyici (Her Kaydın Alan Tiplerini Ayrı Ayrı Yönetme)
-  // ════════════════════════════════════════════════════════════════════════
-
-  Widget _buildRecordLevelTypeEditor(
-      String dbName, String colName, bool isDark) {
-    return FutureBuilder<List<DataRecord>>(
-      future: ref.read(dataExplorerRepositoryProvider).getRecords(
-            databaseId: dbName,
-            collectionName: colName,
-          ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-
-        final records = snapshot.data ?? [];
-
-        if (records.isEmpty) {
-          return _buildEmptyBox(
-            icon: Icons.table_rows_outlined,
-            title: 'Bu koleksiyonda henüz kayıt bulunmamaktadır.',
-            subtitle:
-                'Kayıt eklendikçe her kaydın alan tiplerini ayrı ayrı burada düzenleyebilirsiniz.',
-            isDark: isDark,
-          );
-        }
-
-        final filteredRecords = records.where((r) {
-          if (_searchQuery.isEmpty) return true;
-          final matchId =
-              r.id.toLowerCase().contains(_searchQuery.toLowerCase());
-          final matchData = r.data.entries.any((e) =>
-              e.key.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              e.value.toString().toLowerCase().contains(_searchQuery.toLowerCase()));
-          return matchId || matchData;
-        }).toList();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Üst Bilgi + Kaydet Butonu
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) {
-                      setState(() {
-                        _searchQuery = val.trim();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Kayıt ID veya alan içeriğine göre ara...',
-                      prefixIcon: const Icon(Icons.search),
-                      isDense: true,
-                      filled: true,
-                      fillColor:
-                          isDark ? const Color(0xFF1E293B) : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF334155)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                if (_canUpdateType)
-                  ElevatedButton.icon(
-                    onPressed: _isSavingToDb
-                        ? null
-                        : () => _saveAllRecordLevelTypes(
-                              dbName, colName, records),
-                    icon: _isSavingToDb
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.save_outlined),
-                    label: Text(_isSavingToDb
-                        ? 'Veritabanına Kaydediliyor...'
-                        : 'Tüm Kayıt Değişikliklerini Kaydet'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Kayıt Kartları Listesi
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: filteredRecords.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (context, index) {
-                final rec = filteredRecords[index];
-                return _buildSingleRecordTypeCard(dbName, colName, rec, isDark);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSingleRecordTypeCard(
-    String dbName,
-    String colName,
-    DataRecord rec,
-    bool isDark,
-  ) {
-    _recordCustomTypes.putIfAbsent(rec.id, () => {});
-    final recTypes = _recordCustomTypes[rec.id]!;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Kart Başlığı
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.badge_outlined,
-                    size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Kayıt ID: ${rec.id}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                  ),
-                ),
-                const Spacer(),
-                if (_canUpdateType)
-                  ElevatedButton.icon(
-                    onPressed: () => _saveSingleRecordType(dbName, colName, rec),
-                    icon: const Icon(Icons.save, size: 14),
-                    label: const Text('Bu Kaydı Güncelle'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Alanlar Listesi
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: rec.data.entries.map((entry) {
-                final key = entry.key;
-                final val = entry.value;
-                final currentInferred = _inferType(val);
-                final assignedType = recTypes[key] ?? currentInferred;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF0F172A).withOpacity(0.5)
-                        : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF334155)
-                          : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Alan Adı
-                      SizedBox(
-                        width: 150,
-                        child: Row(
-                          children: [
-                            Icon(_iconForType(assignedType),
-                                size: 16, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                key,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'monospace',
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Mevcut Değer Gösterimi
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1E293B)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: Text(
-                            val.toString(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Tip Seçici Dropdown
-                      SizedBox(
-                        width: 140,
-                        child: DropdownButtonFormField<String>(
-                          value: _validTypeValue(assignedType),
-                          isDense: true,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(),
-                          ),
-                          items: _typeOptions
-                              .map((t) => DropdownMenuItem(
-                                    value: t,
-                                    child: Text(t,
-                                        style: const TextStyle(fontSize: 12)),
-                                  ))
-                              .toList(),
-                          onChanged: _canUpdateType
-                              ? (valType) {
-                                  if (valType != null) {
-                                    setState(() {
-                                      recTypes[key] = valType;
-                                      rec.data[key] =
-                                          _convertValueToType(val, valType);
-                                    });
-                                  }
-                                }
-                              : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _saveSingleRecordType(
-      String dbName, String colName, DataRecord rec) async {
-    try {
-      final creds = ref.read(credentialsProvider);
-      final tcpRepo = ref.read(socketServiceProvider);
-
-      if (creds != null) {
-        await tcpRepo.send(
-          action: 'UPDATE',
-          username: creds.username,
-          password: creds.password,
-          database: dbName,
-          collection: colName,
-          filter: {'_id': rec.id},
-          document: rec.data,
-        );
-
-        ref.invalidate(dataExplorerProvider);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  "ID '${rec.id}' kaydının veri tipleri güncellendi ve veritabanına kaydedildi!"),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Güncelleme hatası: $e"),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveAllRecordLevelTypes(
-      String dbName, String colName, List<DataRecord> records) async {
-    setState(() {
-      _isSavingToDb = true;
-    });
-
-    try {
-      final creds = ref.read(credentialsProvider);
-      final tcpRepo = ref.read(socketServiceProvider);
-
-      int updatedCount = 0;
-      for (final rec in records) {
-        if (creds != null) {
-          await tcpRepo.send(
-            action: 'UPDATE',
-            username: creds.username,
-            password: creds.password,
-            database: dbName,
-            collection: colName,
-            filter: {'_id': rec.id},
-            document: rec.data,
-          );
-          updatedCount++;
-        }
-      }
-
-      ref.invalidate(dataExplorerProvider);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                "Tüm $updatedCount kaydın özel tipleri veritabanına başarıyla kaydedildi!"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Kaydetme hatası: $e"),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSavingToDb = false;
-        });
-      }
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════
   //  Koleksiyon Ekleme Diyalogu
   // ════════════════════════════════════════════════════════════════════════
 
@@ -2004,7 +1742,9 @@ class _DataTypeExplorerPageState
 
       if (creds != null) {
         try {
-          await ref.read(socketServiceProvider).send(
+          await ref
+              .read(socketServiceProvider)
+              .send(
                 action: 'CREATE_COLLECTION',
                 username: creds.username,
                 password: creds.password,
@@ -2030,14 +1770,238 @@ class _DataTypeExplorerPageState
       }
     }
   }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Yeni Feature Ekle ve Feature Sil
+  // ════════════════════════════════════════════════════════════════════════
+
+  Future<void> _showAddFeatureDialog(
+    String dbName,
+    String colName,
+    List<DataRecord> records,
+  ) async {
+    final keyController = TextEditingController();
+    String selectedType = 'String';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Yeni Feature Ekle'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: keyController,
+                    decoration: const InputDecoration(
+                      labelText: 'Alan Adı (Key)',
+                      hintText: 'örn. age, phoneNumber',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: const InputDecoration(
+                      labelText: 'Veri Tipi',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _typeOptions
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedType = val;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (keyController.text.trim().isNotEmpty) {
+                      Navigator.pop(ctx, true);
+                    }
+                  },
+                  child: const Text('Ekle'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    final featureName = keyController.text.trim();
+
+    ref.read(schemaProvider.notifier).setCustomType(dbName, colName, featureName, selectedType);
+
+    setState(() {
+      _isSavingToDb = true;
+    });
+
+    try {
+      final creds = ref.read(credentialsProvider);
+      final tcpRepo = ref.read(socketServiceProvider);
+
+      dynamic defaultValue = _getDefaultValueForType(selectedType);
+      
+      int updatedCount = 0;
+      for (final rec in records) {
+        if (creds != null) {
+          final updatedData = Map<String, dynamic>.from(rec.data);
+          updatedData[featureName] = defaultValue;
+          
+          await tcpRepo.send(
+            action: 'UPDATE',
+            username: creds.username,
+            password: creds.password,
+            database: dbName,
+            collection: colName,
+            filter: {'id': rec.id},
+            document: updatedData,
+          );
+          updatedCount++;
+        }
+      }
+
+      ref.invalidate(dataExplorerProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("'$featureName' eklendi ve $updatedCount kayıt güncellendi."),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Ekleme hatası: $e"), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingToDb = false;
+        });
+      }
+    }
+  }
+
+  dynamic _getDefaultValueForType(String type) {
+    switch (type) {
+      case 'Integer': return 0;
+      case 'Double': return 0.0;
+      case 'Boolean': return false;
+      case 'Array': return [];
+      case 'Object': return {};
+      case 'DateTime': return DateTime.now().toIso8601String();
+      default: return '';
+    }
+  }
+
+  Future<void> _confirmDeleteFeature(
+    String dbName,
+    String colName,
+    String featureName,
+    List<DataRecord> records,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Feature Sil'),
+          content: Text("'$featureName' alanını veritabanındaki tüm kayıtlardan kalıcı olarak silmek istediğinize emin misiniz?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.delete),
+              label: const Text('Sil'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isSavingToDb = true;
+    });
+
+    try {
+      final creds = ref.read(credentialsProvider);
+      final tcpRepo = ref.read(socketServiceProvider);
+
+      int updatedCount = 0;
+      for (final rec in records) {
+        if (creds != null && rec.data.containsKey(featureName)) {
+          final updatedData = Map<String, dynamic>.from(rec.data);
+          updatedData.remove(featureName);
+          
+          await tcpRepo.send(
+            action: 'UPDATE',
+            username: creds.username,
+            password: creds.password,
+            database: dbName,
+            collection: colName,
+            filter: {'id': rec.id},
+            document: updatedData,
+          );
+          updatedCount++;
+        }
+      }
+
+      ref.invalidate(dataExplorerProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("'$featureName' alanı $updatedCount kayıttan silindi."),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Silme hatası: $e"), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingToDb = false;
+        });
+      }
+    }
+  }
 }
 
 class _FieldInfo {
-  final String inferredType;
+  String inferredType;
   int sampleCount;
 
-  _FieldInfo({
-    required this.inferredType,
-    this.sampleCount = 1,
-  });
+  _FieldInfo({required this.inferredType, this.sampleCount = 1});
 }

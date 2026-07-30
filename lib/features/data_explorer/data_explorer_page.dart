@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -16,6 +17,7 @@ import '../databases/controllers/databases_notifier.dart';
 import './controllers/data_explorer_notifier.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../repositories/data_explorer/tcp_data_explorer_repository.dart';
+import '../../core/providers/schema_provider.dart';
 
 enum RecordFieldType {
   string,
@@ -1240,16 +1242,101 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     return idValue.toString();
   }
 
-  Future<void> _showCreateRecordDialog() async {
-    final existingKeys = <String>{};
+  RecordFieldType _mapStringToRecordFieldType(String typeStr) {
+    switch (typeStr.toLowerCase()) {
+      case 'integer': return RecordFieldType.integer;
+      case 'double': return RecordFieldType.double;
+      case 'boolean': return RecordFieldType.boolean;
+      case 'array': return RecordFieldType.array;
+      case 'object': return RecordFieldType.object;
+      case 'datetime': return RecordFieldType.dateTime;
+      default: return RecordFieldType.string;
+    }
+  }
+
+  Map<String, RecordFieldType> _inferCollectionTypes() {
+    final types = <String, RecordFieldType>{};
+    final schema = ref.read(schemaProvider);
+    
+    final dbsAsync = ref.read(databasesProvider);
+    final rawDatabases = dbsAsync.valueOrNull ?? [];
+    String actualDbName = _selectedDatabaseId ?? '';
+    if (actualDbName.isNotEmpty) {
+      try {
+        final db = rawDatabases.firstWhere((d) => d.id == _selectedDatabaseId || d.name == _selectedDatabaseId);
+        actualDbName = db.name.isNotEmpty ? db.name : db.id;
+      } catch (_) {}
+    }
+    final colName = _selectedCollection ?? '';
+
     for (var r in _filteredRecords) {
-      existingKeys.addAll(r.data.keys);
+      for (var entry in r.data.entries) {
+        final key = entry.key;
+        final val = entry.value;
+        
+        final customKey = '${actualDbName}_${colName}_$key';
+        final customTypeStr = schema[customKey];
+        if (customTypeStr != null) {
+           types[key] = _mapStringToRecordFieldType(customTypeStr);
+           continue;
+        }
+
+        if (val != null && !types.containsKey(key)) {
+          if (val is bool) {
+            types[key] = RecordFieldType.boolean;
+          } else if (val is int) {
+            types[key] = RecordFieldType.integer;
+          } else if (val is double) {
+            types[key] = RecordFieldType.double;
+          } else if (val is List) {
+            types[key] = RecordFieldType.array;
+          } else if (val is Map) {
+            types[key] = RecordFieldType.object;
+          } else if (DateTime.tryParse(val.toString()) != null &&
+              val.toString().contains('-') &&
+              val.toString().length >= 10) {
+            types[key] = RecordFieldType.dateTime;
+          } else {
+            types[key] = RecordFieldType.string;
+          }
+        }
+      }
+    }
+    
+    final allKeys = <String>{};
+    for (var r in _filteredRecords) {
+      allKeys.addAll(r.data.keys);
+    }
+    
+    final prefix = '${actualDbName}_${colName}_';
+    for (final sk in schema.keys) {
+      if (sk.startsWith(prefix)) {
+        allKeys.add(sk.substring(prefix.length));
+      }
     }
 
-    final initialData = <String, dynamic>{};
-    for (var key in existingKeys) {
-      initialData[key] = '';
+    for (var key in allKeys) {
+      if (!types.containsKey(key)) {
+        final customKey = '${actualDbName}_${colName}_$key';
+        final customTypeStr = schema[customKey];
+        if (customTypeStr != null) {
+           types[key] = _mapStringToRecordFieldType(customTypeStr);
+        } else {
+           types[key] = RecordFieldType.string;
+        }
+      }
     }
+    
+    return types;
+  }
+
+  Future<void> _showCreateRecordDialog() async {
+    final schemaTypes = _inferCollectionTypes();
+    final initialData = <String, dynamic>{};
+    for (var key in schemaTypes.keys) {
+      initialData[key] = null; // Start empty
+    }
+
     if (initialData.isEmpty) {
       initialData['yeni_alan'] = '';
     }
@@ -1258,6 +1345,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       title: 'Yeni Kayıt',
       initialData: initialData,
       saveButtonText: 'Kaydet',
+      schemaTypes: schemaTypes,
     );
 
     if (result == null || !_hasSelection) {
@@ -1281,10 +1369,20 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
   }
 
   Future<void> _showEditRecordDialog(DataRecord record) async {
+    final schemaTypes = _inferCollectionTypes();
+    final allData = <String, dynamic>{};
+    for (var key in schemaTypes.keys) {
+      allData[key] = record.data[key];
+    }
+    for (var key in record.data.keys) {
+      allData[key] = record.data[key];
+    }
+
     final result = await _showRecordEditorDialog(
       title: 'Kaydı Düzenle',
-      initialData: record.data,
+      initialData: allData,
       saveButtonText: 'Değişiklikleri Kaydet',
+      schemaTypes: schemaTypes,
     );
 
     if (result == null) {
@@ -1315,6 +1413,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     required String title,
     required Map<String, dynamic> initialData,
     required String saveButtonText,
+    Map<String, RecordFieldType>? schemaTypes,
   }) {
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -1327,36 +1426,55 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
         final types = <String, RecordFieldType>{};
 
         void initField(String key, dynamic val) {
-          if (val == null) {
-            types[key] = RecordFieldType.nullValue;
-            controllers[key] = TextEditingController(text: 'null');
-          } else if (val is bool) {
-            types[key] = RecordFieldType.boolean;
-            controllers[key] = TextEditingController(text: val.toString());
-          } else if (val is int) {
-            types[key] = RecordFieldType.integer;
-            controllers[key] = TextEditingController(text: val.toString());
-          } else if (val is double) {
-            types[key] = RecordFieldType.double;
-            controllers[key] = TextEditingController(text: val.toString());
-          } else if (val is num) {
-            types[key] = RecordFieldType.integer;
-            controllers[key] = TextEditingController(text: val.toString());
-          } else if (val is List) {
-            types[key] = RecordFieldType.array;
-            controllers[key] = TextEditingController(text: jsonEncode(val));
-          } else if (val is Map) {
-            types[key] = RecordFieldType.object;
-            controllers[key] = TextEditingController(text: jsonEncode(val));
-          } else if (val != null &&
-              DateTime.tryParse(val.toString()) != null &&
-              val.toString().contains('-') &&
-              val.toString().length >= 10) {
-            types[key] = RecordFieldType.dateTime;
-            controllers[key] = TextEditingController(text: val.toString());
+          final inferredType = schemaTypes?[key];
+
+          if (inferredType != null) {
+            types[key] = inferredType;
+            if (val == null) {
+              if (inferredType == RecordFieldType.boolean) {
+                controllers[key] = TextEditingController(text: 'null');
+              } else {
+                controllers[key] = TextEditingController(text: '');
+              }
+            } else if (inferredType == RecordFieldType.boolean) {
+              controllers[key] = TextEditingController(text: val.toString());
+            } else if (inferredType == RecordFieldType.array || inferredType == RecordFieldType.object) {
+              controllers[key] = TextEditingController(text: (val is List || val is Map) ? jsonEncode(val) : val.toString());
+            } else {
+              controllers[key] = TextEditingController(text: val.toString());
+            }
           } else {
-            types[key] = RecordFieldType.string;
-            controllers[key] = TextEditingController(text: val.toString());
+            if (val == null) {
+              types[key] = RecordFieldType.string;
+              controllers[key] = TextEditingController(text: '');
+            } else if (val is bool) {
+              types[key] = RecordFieldType.boolean;
+              controllers[key] = TextEditingController(text: val.toString());
+            } else if (val is int) {
+              types[key] = RecordFieldType.integer;
+              controllers[key] = TextEditingController(text: val.toString());
+            } else if (val is double) {
+              types[key] = RecordFieldType.double;
+              controllers[key] = TextEditingController(text: val.toString());
+            } else if (val is num) {
+              types[key] = RecordFieldType.integer;
+              controllers[key] = TextEditingController(text: val.toString());
+            } else if (val is List) {
+              types[key] = RecordFieldType.array;
+              controllers[key] = TextEditingController(text: jsonEncode(val));
+            } else if (val is Map) {
+              types[key] = RecordFieldType.object;
+              controllers[key] = TextEditingController(text: jsonEncode(val));
+            } else if (val != null &&
+                DateTime.tryParse(val.toString()) != null &&
+                val.toString().contains('-') &&
+                val.toString().length >= 10) {
+              types[key] = RecordFieldType.dateTime;
+              controllers[key] = TextEditingController(text: val.toString());
+            } else {
+              types[key] = RecordFieldType.string;
+              controllers[key] = TextEditingController(text: val.toString());
+            }
           }
         }
 
@@ -1377,15 +1495,19 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                 final type = types[key]!;
                 final text = controllers[key]!.text.trim();
 
-                if (type == RecordFieldType.nullValue) {
+                if (text.isEmpty && type != RecordFieldType.boolean) {
                   formData[key] = null;
                 } else if (type == RecordFieldType.boolean) {
-                  formData[key] = (text == 'true');
+                  if (text == 'null') {
+                    formData[key] = null;
+                  } else {
+                    formData[key] = (text == 'true');
+                  }
                 } else if (type == RecordFieldType.integer) {
                   formData[key] =
-                      int.tryParse(text) ?? num.tryParse(text)?.toInt() ?? 0;
+                      int.tryParse(text) ?? num.tryParse(text)?.toInt();
                 } else if (type == RecordFieldType.double) {
-                  formData[key] = double.tryParse(text) ?? 0.0;
+                  formData[key] = double.tryParse(text);
                 } else if (type == RecordFieldType.dateTime) {
                   formData[key] = text;
                 } else if (type == RecordFieldType.array ||
@@ -1511,213 +1633,65 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
-                                              DropdownButton<RecordFieldType>(
-                                                value: types[e.key],
-                                                isDense: true,
-                                                underline: const SizedBox(),
-                                                onChanged: (val) {
-                                                  if (val != null) {
-                                                    setDialogState(() {
-                                                      types[e.key] = val;
-                                                      if (val ==
-                                                          RecordFieldType
-                                                              .boolean) {
-                                                        e.value.text = 'true';
-                                                      } else if (val ==
-                                                          RecordFieldType
-                                                              .nullValue) {
-                                                        e.value.text = 'null';
-                                                      }
-                                                    });
-                                                  }
-                                                },
-                                                items: const [
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.string,
-                                                    child: Text(
-                                                      'String',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blueGrey
+                                                      .withOpacity(0.1),
+                                                  borderRadius: BorderRadius
+                                                      .circular(6),
+                                                ),
+                                                child: Text(
+                                                  types[e.key].toString().split('.').last.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.blueGrey,
                                                   ),
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.integer,
-                                                    child: Text(
-                                                      'Integer',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.double,
-                                                    child: Text(
-                                                      'Double',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.boolean,
-                                                    child: Text(
-                                                      'Boolean',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value: RecordFieldType
-                                                        .dateTime,
-                                                    child: Text(
-                                                      'DateTime',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.array,
-                                                    child: Text(
-                                                      'Array',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value:
-                                                        RecordFieldType.object,
-                                                    child: Text(
-                                                      'Object',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value: RecordFieldType
-                                                        .nullValue,
-                                                    child: Text(
-                                                      'Null',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 flex: 3,
                                                 child:
-                                                    types[e.key] ==
-                                                        RecordFieldType.boolean
-                                                    ? DropdownButtonFormField<
-                                                        String
-                                                      >(
-                                                        value:
-                                                            (e.value.text ==
-                                                                    'true' ||
-                                                                e.value.text ==
-                                                                    'false')
-                                                            ? e.value.text
-                                                            : 'true',
-                                                        decoration:
-                                                            const InputDecoration(
+                                                    types[e.key] == RecordFieldType.boolean
+                                                        ? DropdownButtonFormField<String>(
+                                                            value: (e.value.text == 'true' || e.value.text == 'false') ? e.value.text : 'null',
+                                                            decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                                                            items: const [
+                                                              DropdownMenuItem(value: 'true', child: Text('True')),
+                                                              DropdownMenuItem(value: 'false', child: Text('False')),
+                                                              DropdownMenuItem(value: 'null', child: Text('Boş')),
+                                                            ],
+                                                            onChanged: (val) {
+                                                              if (val != null) e.value.text = val;
+                                                            },
+                                                          )
+                                                        : TextField(
+                                                            controller: e.value,
+                                                            enabled: types[e.key] != RecordFieldType.nullValue,
+                                                            keyboardType: types[e.key] == RecordFieldType.integer || types[e.key] == RecordFieldType.double
+                                                                ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+                                                                : TextInputType.text,
+                                                            inputFormatters: types[e.key] == RecordFieldType.integer
+                                                                ? [FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*'))]
+                                                                : (types[e.key] == RecordFieldType.double
+                                                                    ? [FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*'))]
+                                                                    : []),
+                                                            decoration: const InputDecoration(
                                                               isDense: true,
-                                                              border:
-                                                                  OutlineInputBorder(),
-                                                            ),
-                                                        items: const [
-                                                          DropdownMenuItem(
-                                                            value: 'true',
-                                                            child: Text('True'),
-                                                          ),
-                                                          DropdownMenuItem(
-                                                            value: 'false',
-                                                            child: Text(
-                                                              'False',
+                                                              border: OutlineInputBorder(),
                                                             ),
                                                           ),
-                                                        ],
-                                                        onChanged: (val) {
-                                                          if (val != null)
-                                                            e.value.text = val;
-                                                        },
-                                                      )
-                                                    : TextField(
-                                                        controller: e.value,
-                                                        enabled:
-                                                            types[e.key] !=
-                                                            RecordFieldType
-                                                                .nullValue,
-                                                        decoration:
-                                                            const InputDecoration(
-                                                              isDense: true,
-                                                              border:
-                                                                  OutlineInputBorder(),
-                                                            ),
-                                                      ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                  color: Colors.red,
-                                                ),
-                                                onPressed: () {
-                                                  setDialogState(() {
-                                                    controllers.remove(e.key);
-                                                    types.remove(e.key);
-                                                    formData.remove(e.key);
-                                                  });
-                                                },
                                               ),
                                             ],
                                           ),
                                         );
                                       }).toList(),
                                     ),
-                            ),
-                            const Divider(),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: newKeyController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Yeni Alan (Key)',
-                                      isDense: true,
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Ekle'),
-                                  onPressed: () {
-                                    final k = newKeyController.text.trim();
-                                    if (k.isNotEmpty &&
-                                        !controllers.containsKey(k)) {
-                                      setDialogState(() {
-                                        formData[k] = '';
-                                        types[k] = RecordFieldType.string;
-                                        controllers[k] =
-                                            TextEditingController();
-                                        newKeyController.clear();
-                                      });
-                                    }
-                                  },
-                                ),
-                              ],
                             ),
                           ],
                         ), // end of Column
