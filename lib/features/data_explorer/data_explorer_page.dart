@@ -18,6 +18,7 @@ import './controllers/data_explorer_notifier.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../repositories/data_explorer/tcp_data_explorer_repository.dart';
 import '../../core/providers/schema_provider.dart';
+import '../../repositories/schema/schema_repository.dart';
 
 enum RecordFieldType {
   string,
@@ -51,7 +52,6 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
   String? _selectedCollection;
 
   bool _showJsonView = false;
-  bool _isImporting = false;
 
   static final Map<String, Set<String>> _extraCollections = {};
   static final Map<String, List<String>> _serverCollections = {};
@@ -922,10 +922,6 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       return;
     }
 
-    setState(() {
-      _isImporting = true;
-    });
-
     try {
       final result = await FilePicker.pickFiles(
         dialogTitle: 'MongoDB JSON dosyasını seçin',
@@ -982,12 +978,6 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       _showErrorMessage(
         'JSON dosyası içe aktarılırken bir hata oluştu: $error',
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isImporting = false;
-        });
-      }
     }
   }
 
@@ -1248,18 +1238,6 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     return idValue.toString();
   }
 
-  RecordFieldType _mapStringToRecordFieldType(String typeStr) {
-    switch (typeStr.toLowerCase()) {
-      case 'integer': return RecordFieldType.integer;
-      case 'double': return RecordFieldType.double;
-      case 'boolean': return RecordFieldType.boolean;
-      case 'array': return RecordFieldType.array;
-      case 'object': return RecordFieldType.object;
-      case 'datetime': return RecordFieldType.dateTime;
-      default: return RecordFieldType.string;
-    }
-  }
-
   Future<Map<String, SchemaField>> _getCollectionSchema() async {
     final types = <String, SchemaField>{};
     if (_selectedDatabaseId == null || _selectedCollection == null) return types;
@@ -1428,8 +1406,6 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
         final jsonController = TextEditingController(
           text: const JsonEncoder.withIndent(' ').convert(formData),
         );
-
-        final newKeyController = TextEditingController();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
