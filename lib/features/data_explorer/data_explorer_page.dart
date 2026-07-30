@@ -1252,6 +1252,16 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       initialData[key] = null; // Başlangıçta boş değer
     }
 
+    final records = ref.read(dataExplorerProvider).valueOrNull ?? [];
+    if (records.isNotEmpty) {
+      final columns = _findColumns(records);
+      for (var col in columns) {
+        if (col != '_id' && !initialData.containsKey(col)) {
+          initialData[col] = '';
+        }
+      }
+    }
+
     if (initialData.isEmpty) {
       initialData['yeni_alan'] = '';
     }
@@ -1292,10 +1302,22 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     for (var key in schemaTypes.keys) {
       allData[key] = record.data[key];
     }
-    for (var key in record.data.keys) {
-      allData[key] = record.data[key];
+
+    final records = ref.read(dataExplorerProvider).valueOrNull ?? [];
+    if (records.isNotEmpty) {
+      final columns = _findColumns(records);
+      for (var col in columns) {
+        if (col != '_id' && !allData.containsKey(col)) {
+          allData[col] = record.data[col];
+        }
+      }
     }
 
+    for (var key in record.data.keys) {
+      if (key != '_id') {
+        allData[key] = record.data[key];
+      }
+    }
     final result = await _showRecordEditorDialog(
       title: 'Kaydı Düzenle',
       initialData: allData,
