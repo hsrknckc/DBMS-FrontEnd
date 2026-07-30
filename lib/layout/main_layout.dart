@@ -18,15 +18,17 @@ import 'app_top_bar.dart';
 import 'user_profile_dialog.dart';
 import 'logout_confirmation_dialog.dart';
 import '../main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/auth/controllers/auth_notifier.dart';
 
-class MainLayout extends StatefulWidget {
+class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends ConsumerState<MainLayout> {
   AppPage _selectedPage = AppPage.dashboard;
   bool _showSuperAdmin = true;
 
@@ -36,16 +38,6 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   void initState() {
     super.initState();
-    // İlk başlangıç verileri
-    _currentUser = const AppUser(
-      id: '1',
-      name: 'Ahmet Yılmaz',
-      email: 'ahmet.yilmaz@company.com',
-      role: UserRole.superAdmin,
-      departments: <String>{'IT', 'Database Admin'},
-      permissions: <Permission>{},
-      isActive: true,
-    );
   }
 
   // Profil bilgilerini içeride güncelleyen metod
@@ -196,6 +188,24 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
+    
+    // Auth provider'dan mevcut kullanıcıyı dinliyoruz
+    final userAsync = ref.watch(authNotifierProvider);
+    final user = userAsync.valueOrNull;
+
+    // Eğer henüz yüklenmemişse geçici boş bir model oluştur veya bekle
+    final displayUser = user ?? const AppUser(
+      id: '0', 
+      name: 'Yükleniyor...', 
+      email: '', 
+      role: UserRole.superAdmin, 
+      departments: {}, 
+      permissions: {}, 
+      isActive: true,
+    );
+    _currentUser = displayUser;
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final Color textColor = isDark ? Colors.white : AppColors.textPrimary;
