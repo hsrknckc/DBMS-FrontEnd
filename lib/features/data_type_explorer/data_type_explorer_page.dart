@@ -573,22 +573,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      _showExportCodeDialog(dbName, colName, fieldsMap, customTypes),
-                  icon: const Icon(Icons.code),
-                  label: const Text('Şemayı Kod Olarak Aktar'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+
                 if (_canUpdateType) ...[
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
