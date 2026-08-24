@@ -145,7 +145,7 @@ class _ProfileSectionState extends State<ProfileSection> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: (isActive ? Colors.green : Colors.red).withOpacity(0.15),
+                                    color: (isActive ? Colors.green : Colors.red).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -380,7 +380,7 @@ class _ProfileSectionState extends State<ProfileSection> {
             filled: true,
             fillColor: inputBgColor,
             hintText: '••••••••',
-            hintStyle: TextStyle(color: subtitleColor.withOpacity(0.5)),
+            hintStyle: TextStyle(color: subtitleColor.withValues(alpha: 0.5)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),

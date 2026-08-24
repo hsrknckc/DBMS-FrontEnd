@@ -127,8 +127,9 @@ class TcpDataExplorerRepository implements DataExplorerRepository {
     if (rawData is List && rawData.isNotEmpty) {
       final first = rawData.first;
       if (first is Map<String, dynamic>) return DataRecord.fromJson(first);
-      if (first is Map)
+      if (first is Map) {
         return DataRecord.fromJson(Map<String, dynamic>.from(first));
+      }
     }
 
     throw TcpException('Kayıt bulunamadı: $id');

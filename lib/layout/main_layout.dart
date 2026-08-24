@@ -6,7 +6,6 @@ import '../features/data_type_explorer/data_type_explorer_page.dart';
 import '../features/permissions/permissions_page.dart';
 import 'package:dmbs_frontend/features/settings/settings_page.dart';
 import 'package:dmbs_frontend/features/users/users_page.dart';
-import 'package:dmbs_frontend/models/permission.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/app_user.dart';

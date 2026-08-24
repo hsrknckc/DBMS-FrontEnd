@@ -223,7 +223,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
               SizedBox(
                 width: isNarrow ? constraints.maxWidth : 230,
                 child: DropdownButtonFormField<AuditAction?>(
-                  value: _selectedAction,
+                  initialValue: _selectedAction,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'İşlem türü'),
                   items: [
@@ -320,7 +320,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
         child: ListView.separated(
           padding: const EdgeInsets.all(12),
           itemCount: logs.length,
-          separatorBuilder: (_, __) {
+          separatorBuilder: (_, _) {
             return const Divider(height: 1);
           },
           itemBuilder: (context, index) {
@@ -508,7 +508,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.08),
+                        color: AppColors.success.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -668,7 +668,7 @@ class _SummaryCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.10),
+              color: iconColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: iconColor, size: 22),
@@ -762,7 +762,7 @@ class _ActionIcon extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.10),
+        color: AppColors.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(11),
       ),
       child: Icon(icon, color: AppColors.primary, size: 21),
@@ -800,7 +800,7 @@ class _RevertedBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.success.withOpacity(0.10),
+        color: AppColors.success.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Text(

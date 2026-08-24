@@ -1,5 +1,6 @@
 /// Dashboard için özet istatistik modelleri.
 /// Backend: GET /dashboard/stats
+library;
 
 class DashboardStats {
   final int totalDatabases;

@@ -63,7 +63,7 @@ class _AppearanceSectionState extends State<AppearanceSection> {
                     style: TextStyle(color: subtitleColor),
                   ),
                   value: isDark,
-                  activeColor: const Color(0xFF4F46E5), // Projenin ana buton rengiyle eşleyebilirsiniz
+                  activeThumbColor: const Color(0xFF4F46E5), // Projenin ana buton rengiyle eşleyebilirsiniz
                   onChanged: (val) {
                     setState(() {
                       myApp?.toggleTheme(val);
@@ -86,7 +86,7 @@ class _AppearanceSectionState extends State<AppearanceSection> {
                     style: TextStyle(color: subtitleColor),
                   ),
                   value: isCompact,
-                  activeColor: const Color(0xFF4F46E5),
+                  activeThumbColor: const Color(0xFF4F46E5),
                   onChanged: (val) {
                     setState(() {
                       myApp?.setCompactSidebar(val);

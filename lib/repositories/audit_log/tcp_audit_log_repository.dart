@@ -30,7 +30,7 @@ class TcpAuditLogRepository implements AuditLogRepository {
       password: c.password,
       filter: {
         if (action != null) 'action': action.code,
-        if (onlyRevertible != null) 'onlyRevertible': onlyRevertible,
+        'onlyRevertible': ?onlyRevertible,
       },
     );
 

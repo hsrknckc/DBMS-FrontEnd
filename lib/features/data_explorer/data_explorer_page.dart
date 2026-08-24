@@ -405,7 +405,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
               SizedBox(
                 width: isNarrow ? constraints.maxWidth : 300,
                 child: DropdownButtonFormField<String>(
-                  value:
+                  initialValue:
                       _visibleDatabases.any(
                         (db) => db.id == _selectedDatabaseId,
                       )
@@ -459,7 +459,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value:
+                        initialValue:
                             (_selectedDatabase?.collections.contains(
                                   _selectedCollection,
                                 ) ??
@@ -823,7 +823,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: records.length,
-        separatorBuilder: (_, __) {
+        separatorBuilder: (_, _) {
           return const SizedBox(height: 14);
         },
         itemBuilder: (context, index) {
@@ -1099,7 +1099,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: previewDocuments.length,
-                    separatorBuilder: (_, __) {
+                    separatorBuilder: (_, _) {
                       return const SizedBox(height: 10);
                     },
                     itemBuilder: (context, index) {
@@ -1238,7 +1238,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     if (_selectedDatabaseId == null || _selectedCollection == null) return types;
     
     try {
-      final schemaMap = await ref.read(collectionSchemaProvider('${_selectedDatabaseId}::$_selectedCollection').future);
+      final schemaMap = await ref.read(collectionSchemaProvider('$_selectedDatabaseId::$_selectedCollection').future);
       return schemaMap;
     } catch (_) {}
     
@@ -1453,8 +1453,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
             void syncToForm() {
               try {
                 final decoded = jsonDecode(jsonController.text);
-                if (decoded is! Map<String, dynamic>)
+                if (decoded is! Map<String, dynamic>) {
                   throw const FormatException();
+                }
 
                 formData.clear();
                 formData.addAll(decoded);
@@ -1564,7 +1565,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.blueGrey
-                                                      .withOpacity(0.1),
+                                                      .withValues(alpha: 0.1),
                                                   borderRadius: BorderRadius
                                                       .circular(6),
                                                 ),
@@ -1583,7 +1584,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                                                 child:
                                                     types[e.key] == RecordFieldType.boolean
                                                         ? DropdownButtonFormField<String>(
-                                                            value: (e.value.text == 'true' || e.value.text == 'false') ? e.value.text : 'null',
+                                                            initialValue: (e.value.text == 'true' || e.value.text == 'false') ? e.value.text : 'null',
                                                             decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
                                                             items: const [
                                                               DropdownMenuItem(value: 'true', child: Text('True')),
@@ -1725,7 +1726,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.12),
+                    color: AppColors.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Row(
@@ -1782,7 +1783,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
 
     final collectionName = _selectedCollection ?? 'export';
     final ext = format.toLowerCase(); // 'json' veya 'csv'
-    final defaultFileName = '${collectionName}.$ext';
+    final defaultFileName = '$collectionName.$ext';
 
     String? initialDir;
     try {
@@ -2042,10 +2043,10 @@ if ($d.ShowDialog() -eq 'OK') { Write-Output $d.FileName }
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
+                          color: AppColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppColors.primary.withOpacity(0.3),
+                            color: AppColors.primary.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -2273,7 +2274,7 @@ class _InfoBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(

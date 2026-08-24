@@ -72,7 +72,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final schemaAsync = _selectedDatabaseId != null && _selectedCollection != null ? ref.watch(collectionSchemaProvider('${_selectedDatabaseId}::$_selectedCollection')) : const AsyncValue.data(<String, SchemaField>{});
+    final schemaAsync = _selectedDatabaseId != null && _selectedCollection != null ? ref.watch(collectionSchemaProvider('$_selectedDatabaseId::$_selectedCollection')) : const AsyncValue.data(<String, SchemaField>{});
     final customTypes = schemaAsync.valueOrNull ?? <String, SchemaField>{};
     final dbsAsync = ref.watch(databasesProvider);
     final rawDatabases = dbsAsync.valueOrNull ?? [];
@@ -286,7 +286,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
 
   Future<void> _updateSchemaFields(String dbName, String colName, Map<String, String> newTypes) async {
     final schemaRepo = ref.read(schemaRepositoryProvider);
-    final currentSchema = await ref.read(collectionSchemaProvider('${dbName}::${colName}').future);
+    final currentSchema = await ref.read(collectionSchemaProvider('$dbName::$colName').future);
     
     final updatedFields = Map<String, SchemaField>.from(currentSchema);
     
@@ -310,7 +310,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
         collectionName: colName,
         fields: fieldsList,
       );
-      ref.invalidate(collectionSchemaProvider('${dbName}::${colName}'));
+      ref.invalidate(collectionSchemaProvider('$dbName::$colName'));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
@@ -372,7 +372,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                 return ChoiceChip(
                   label: Text(c),
                   selected: isSelected,
-                  selectedColor: AppColors.primary.withOpacity(0.15),
+                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
                   labelStyle: TextStyle(
                     color: isSelected
                         ? AppColors.primary
@@ -646,9 +646,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -915,7 +915,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                                       decoration: BoxDecoration(
                                         color: _colorForType(
                                           info.inferredType,
-                                        ).withOpacity(0.1),
+                                        ).withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -988,8 +988,8 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isOverridden
-                                            ? Colors.amber.withOpacity(0.15)
-                                            : Colors.green.withOpacity(0.1),
+                                            ? Colors.amber.withValues(alpha: 0.15)
+                                            : Colors.green.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -1561,7 +1561,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 20, color: color),
@@ -1665,8 +1665,9 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
     if (val != null &&
         DateTime.tryParse(val.toString()) != null &&
         val.toString().contains('-') &&
-        val.toString().length >= 10)
+        val.toString().length >= 10) {
       return 'DateTime';
+    }
     return 'String';
   }
 
@@ -1814,7 +1815,7 @@ class _DataTypeExplorerPageState extends ConsumerState<DataTypeExplorerPage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: selectedType,
+                    initialValue: selectedType,
                     decoration: const InputDecoration(
                       labelText: 'Veri Tipi',
                       border: OutlineInputBorder(),

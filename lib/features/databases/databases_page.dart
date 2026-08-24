@@ -251,7 +251,7 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
                     ? constraints.maxWidth
                     : 220,
                 child: DropdownButtonFormField<String?>(
-                  value: _selectedDepartment,
+                  initialValue: _selectedDepartment,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Departman',
@@ -438,7 +438,7 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: selectedDepartment,
+                      initialValue: selectedDepartment,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Departman',
@@ -894,7 +894,7 @@ class _DatabaseCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.10),
+                  color: AppColors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: const Icon(
@@ -1032,7 +1032,7 @@ class _SummaryCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.10),
+              color: iconColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(

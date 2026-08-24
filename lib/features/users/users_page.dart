@@ -308,7 +308,7 @@ class _UsersPageState extends ConsumerState<UsersPage> {
               children: [
                 CircleAvatar(
                   radius: 19,
-                  backgroundColor: AppColors.primary.withOpacity(0.10),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.10),
                   child: Text(
                     user.initials,
                     style: const TextStyle(
@@ -1073,7 +1073,7 @@ class _SummaryCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.10),
+              color: iconColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: iconColor, size: 22),
@@ -1139,7 +1139,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -1162,7 +1162,7 @@ class _DeletedBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.danger.withOpacity(0.10),
+        color: AppColors.danger.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Text(

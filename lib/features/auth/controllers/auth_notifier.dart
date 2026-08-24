@@ -1,14 +1,30 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/app_user.dart';
+import '../../../models/permission.dart';
 import '../../../core/providers/repository_providers.dart';
 
 /// Auth state notifier'ı.
-/// Kullanım: `ref.watch(authNotifierProvider)`
+/// Kullanım: ⁠ ref.watch(authNotifierProvider) ⁠
 class AuthNotifier extends AsyncNotifier<AppUser?> {
   @override
   Future<AppUser?> build() async {
-    // Uygulama açılırken kayıtlı token ile oturum kontrol et
-    return ref.read(authRepositoryProvider).getCurrentUser();
+    // -------------------------------------------------------------
+    // GEÇİCİ: Super Admin olarak otomatik başlat
+    // (Geri almak için bu bloğu silip alttaki satırın yorumunu kaldırın)
+    return AppUser(
+      id: 'super-admin-test',
+      name: 'Super Admin',
+      email: 'admin@company.com',
+      role: UserRole.superAdmin,
+      departments: const {'IT', 'Database Admin'},
+      permissions: Permission.values.toSet(),
+      isActive: true,
+      createdAt: DateTime.now(),
+    );
+    // -------------------------------------------------------------
+
+    // Orijinal:
+    // return ref.read(authRepositoryProvider).getCurrentUser();
   }
 
   Future<void> login(String email, String password) async {
@@ -22,7 +38,7 @@ class AuthNotifier extends AsyncNotifier<AppUser?> {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
   }
-
+  
   Future<void> requestPasswordReset(String email) async {
     await ref.read(authRepositoryProvider).requestPasswordReset(email);
   }
