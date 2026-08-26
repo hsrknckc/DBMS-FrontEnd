@@ -275,8 +275,8 @@ class TcpSocketService {
   /// PROTOKOL.md Standart Tek Protokol Gönderim Metodu
   Future<Map<String, dynamic>> send({
     required String action,
-    required String username,
-    required String password,
+    String? username,
+    String? password,
     String? database,
     String? collection,
     Map<String, dynamic>? filter,

@@ -60,6 +60,15 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    // Mock implementation.
+  }
+
+  @override
   Future<AppUser?> getCurrentUser() async {
     return _currentUser;
   }

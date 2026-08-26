@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/app_user.dart';
-import '../../../models/permission.dart';
 import '../../../core/providers/repository_providers.dart';
 
 /// Auth state notifier'ı.
@@ -37,6 +36,20 @@ class AuthNotifier extends AsyncNotifier<AppUser?> {
 
   Future<void> requestPasswordReset(String email) async {
     await ref.read(authRepositoryProvider).requestPasswordReset(email);
+  }
+
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    await ref
+        .read(authRepositoryProvider)
+        .confirmPasswordReset(
+          email: email,
+          resetCode: resetCode,
+          newPassword: newPassword,
+        );
   }
 
   /// Giriş yapılmış mı?

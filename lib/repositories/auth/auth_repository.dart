@@ -15,6 +15,12 @@ abstract class AuthRepository {
   /// Şifre sıfırlama bağlantısı/kodu gönderir.
   Future<void> requestPasswordReset(String email);
 
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String resetCode,
+    required String newPassword,
+  });
+  
   /// Kayıtlı token ile mevcut kullanıcıyı getirir.
   /// Token yoksa veya geçersizse null döner.
   Future<AppUser?> getCurrentUser();

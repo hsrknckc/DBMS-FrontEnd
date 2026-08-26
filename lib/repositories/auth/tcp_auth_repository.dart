@@ -69,9 +69,48 @@ class TcpAuthRepository implements AuthRepository {
 
   @override
   Future<void> requestPasswordReset(String email) async {
-    // Sunucu tarafında parola sıfırlama işlemi bulunmuyor.
+    final response = await _tcp.send(
+      action: 'REQUEST_PASSWORD_RESET',
+      document: {
+        'email': email.trim(),
+      },
+    );
+
+    final status = response['status']?.toString();
+
+    if (status != 'OK') {
+      throw Exception(
+        response['message']?.toString() ??
+            'Şifre sıfırlama talebi gönderilemedi.',
+      );
+    }
   }
 
+  @override
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    final response = await _tcp.send(
+      action: 'CONFIRM_PASSWORD_RESET',
+      document: {
+        'email': email.trim(),
+        'resetCode': resetCode.trim(),
+        'newPassword': newPassword,
+      },
+    );
+
+    final status = response['status']?.toString();
+
+    if (status != 'OK') {
+      throw Exception(
+        response['message']?.toString() ??
+            'Şifre sıfırlama işlemi tamamlanamadı.',
+      );
+    }
+  }
+  
   @override
   Future<AppUser?> getCurrentUser() async {
     final creds = _activeCredentials ?? _credentialsNotifier?.state;

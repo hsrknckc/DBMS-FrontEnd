@@ -37,6 +37,17 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    throw UnimplementedError(
+      'HTTP password reset confirmation is not implemented.',
+    );
+  }
+
+  @override
   Future<AppUser?> getCurrentUser() async {
     // TODO: GET /auth/me
     // Header: Authorization: Bearer <token>
