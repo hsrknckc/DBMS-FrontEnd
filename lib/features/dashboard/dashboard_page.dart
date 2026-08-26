@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'controllers/dashboard_notifier.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
+import '../../models/dashboard_stats.dart';
 import '../databases/controllers/databases_notifier.dart';
 import '../users/controllers/users_notifier.dart';
 
@@ -17,6 +19,7 @@ class DashboardPage extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final dbs = ref.watch(databasesProvider).valueOrNull ?? [];
     final users = ref.watch(usersProvider).valueOrNull ?? [];
+    final systemStatus = ref.watch(systemStatusProvider);
 
     var totalCollections = 0;
     var totalRecords = 0;
@@ -28,7 +31,11 @@ class DashboardPage extends ConsumerWidget {
     final activeUsers = users.where((user) => user.isActive).length;
     final stats = [
       _StatItem('Databases', dbs.length.toString(), Icons.dns_rounded),
-      _StatItem('Collections', totalCollections.toString(), Icons.folder_rounded),
+      _StatItem(
+        'Collections',
+        totalCollections.toString(),
+        Icons.folder_rounded,
+      ),
       _StatItem('Records', totalRecords.toString(), Icons.view_list_rounded),
       _StatItem('Active Users', activeUsers.toString(), Icons.groups_rounded),
     ];
@@ -51,7 +58,7 @@ class DashboardPage extends ConsumerWidget {
                   children: [
                     _OperationsPanel(isDark: isDark),
                     const SizedBox(height: 18),
-                    _SystemPanel(isDark: isDark),
+                    _SystemPanel(isDark: isDark, status: systemStatus),
                   ],
                 );
               }
@@ -60,7 +67,10 @@ class DashboardPage extends ConsumerWidget {
                 children: [
                   Expanded(flex: 7, child: _OperationsPanel(isDark: isDark)),
                   const SizedBox(width: 18),
-                  Expanded(flex: 4, child: _SystemPanel(isDark: isDark)),
+                  Expanded(
+                    flex: 4,
+                    child: _SystemPanel(isDark: isDark, status: systemStatus),
+                  ),
                 ],
               );
             },
@@ -85,10 +95,12 @@ class _HeroPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final panelColor =
-        isDark ? Colors.white.withValues(alpha: 0.055) : const Color(0xF7FFFFFF);
-    final borderColor =
-        isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFD8E0EA);
+    final panelColor = isDark
+        ? Colors.white.withValues(alpha: 0.055)
+        : const Color(0xF7FFFFFF);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : const Color(0xFFD8E0EA);
     final accent = isDark ? AppColors.accent : AppColors.primary;
 
     return Container(
@@ -98,8 +110,9 @@ class _HeroPanel extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? AppColors.violet : Colors.black)
-                .withValues(alpha: isDark ? 0.16 : 0.07),
+            color: (isDark ? AppColors.violet : Colors.black).withValues(
+              alpha: isDark ? 0.16 : 0.07,
+            ),
             blurRadius: 38,
             offset: const Offset(0, 20),
           ),
@@ -109,7 +122,9 @@ class _HeroPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: Stack(
           children: [
-            Positioned.fill(child: CustomPaint(painter: _CircuitPainter(isDark))),
+            Positioned.fill(
+              child: CustomPaint(painter: _CircuitPainter(isDark)),
+            ),
             Padding(
               padding: const EdgeInsets.all(28),
               child: Column(
@@ -163,10 +178,15 @@ class _HeroPanel extends StatelessWidget {
                           spacing: 12,
                           runSpacing: 12,
                           children: stats
-                              .map((item) => SizedBox(
-                                    width: 210,
-                                    child: _MetricTile(item: item, isDark: isDark),
-                                  ))
+                              .map(
+                                (item) => SizedBox(
+                                  width: 210,
+                                  child: _MetricTile(
+                                    item: item,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              )
                               .toList(),
                         );
                       }
@@ -174,9 +194,13 @@ class _HeroPanel extends StatelessWidget {
                         children: [
                           for (var i = 0; i < stats.length; i++) ...[
                             Expanded(
-                              child: _MetricTile(item: stats[i], isDark: isDark),
+                              child: _MetricTile(
+                                item: stats[i],
+                                isDark: isDark,
+                              ),
                             ),
-                            if (i != stats.length - 1) const SizedBox(width: 12),
+                            if (i != stats.length - 1)
+                              const SizedBox(width: 12),
                           ],
                         ],
                       );
@@ -307,11 +331,19 @@ class _OperationsPanel extends StatelessWidget {
 
 class _SystemPanel extends StatelessWidget {
   final bool isDark;
+  final AsyncValue<SystemStatus> status;
 
-  const _SystemPanel({required this.isDark});
+  const _SystemPanel({required this.isDark, required this.status});
 
   @override
   Widget build(BuildContext context) {
+    final current = status.valueOrNull;
+    final isLoading = status.isLoading && current == null;
+    final hasError = status.hasError && current == null;
+
+    final tcpOk = !hasError && (current?.isApiOnline ?? false);
+    final mongoOk = !hasError && (current?.isMongoConnected ?? false);
+
     return _PanelShell(
       isDark: isDark,
       title: 'Sistem Durumu',
@@ -319,17 +351,33 @@ class _SystemPanel extends StatelessWidget {
       child: Column(
         children: [
           _StatusRow(
-            label: 'TCP Soket Bağlantısı',
-            value: 'Aktif',
+            label: 'TCP Socket Bağlantısı',
+            value: hasError
+                ? 'Ulaşılamıyor'
+                : isLoading
+                ? 'Kontrol ediliyor'
+                : tcpOk
+                ? 'Aktif'
+                : 'Pasif',
             icon: Icons.settings_input_antenna_rounded,
             isDark: isDark,
+            isOk: tcpOk,
+            isLoading: isLoading,
           ),
           const SizedBox(height: 12),
           _StatusRow(
             label: 'MongoDB Servisi',
-            value: 'Bağlı',
+            value: hasError
+                ? 'Bilinmiyor'
+                : isLoading
+                ? 'Kontrol ediliyor'
+                : mongoOk
+                ? 'Bağlı'
+                : 'Bağlı değil',
             icon: Icons.dataset_linked_rounded,
             isDark: isDark,
+            isOk: mongoOk,
+            isLoading: isLoading,
           ),
           const SizedBox(height: 18),
           Container(
@@ -376,12 +424,15 @@ class _PanelShell extends StatelessWidget {
         color: isDark ? Colors.white.withValues(alpha: 0.055) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFD8E0EA),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFD8E0EA),
         ),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? AppColors.accent : Colors.black)
-                .withValues(alpha: isDark ? 0.12 : 0.055),
+            color: (isDark ? AppColors.accent : Colors.black).withValues(
+              alpha: isDark ? 0.12 : 0.055,
+            ),
             blurRadius: 30,
             offset: const Offset(0, 16),
           ),
@@ -405,10 +456,10 @@ class _PanelShell extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
-                    ),
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -425,16 +476,26 @@ class _StatusRow extends StatelessWidget {
   final String value;
   final IconData icon;
   final bool isDark;
+  final bool isOk;
+  final bool isLoading;
 
   const _StatusRow({
     required this.label,
     required this.value,
     required this.icon,
     required this.isDark,
+    required this.isOk,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = isLoading
+        ? AppColors.warning
+        : isOk
+        ? AppColors.success
+        : AppColors.danger;
+
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
@@ -445,7 +506,17 @@ class _StatusRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.success, size: 20),
+          if (isLoading)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: statusColor,
+              ),
+            )
+          else
+            Icon(icon, color: statusColor, size: 20),
           const SizedBox(width: 11),
           Expanded(
             child: Text(
@@ -460,10 +531,7 @@ class _StatusRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: AppColors.success,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: statusColor, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -550,8 +618,9 @@ class _CircuitPainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
-      ..color = (isDark ? AppColors.accent : AppColors.primary)
-          .withValues(alpha: isDark ? 0.13 : 0.07);
+      ..color = (isDark ? AppColors.accent : AppColors.primary).withValues(
+        alpha: isDark ? 0.13 : 0.07,
+      );
 
     for (var i = 0; i < 8; i++) {
       final y = 28.0 + i * 28;
@@ -563,8 +632,9 @@ class _CircuitPainter extends CustomPainter {
 
     final fill = Paint()
       ..style = PaintingStyle.fill
-      ..color = (isDark ? AppColors.accent : AppColors.accent)
-          .withValues(alpha: isDark ? 0.10 : 0.08);
+      ..color = (isDark ? AppColors.accent : AppColors.accent).withValues(
+        alpha: isDark ? 0.10 : 0.08,
+      );
 
     final path = Path()
       ..moveTo(size.width * 0.70, 0)
@@ -589,8 +659,9 @@ class _MiniGraphPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final grid = Paint()
-      ..color = (isDark ? Colors.white : AppColors.textSecondary)
-          .withValues(alpha: isDark ? 0.055 : 0.09)
+      ..color = (isDark ? Colors.white : AppColors.textSecondary).withValues(
+        alpha: isDark ? 0.055 : 0.09,
+      )
       ..strokeWidth = 1;
     for (double x = 14; x < size.width; x += 32) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
