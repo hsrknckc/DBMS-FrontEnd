@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme/app_colors.dart';
 import 'controllers/auth_notifier.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   final VoidCallback onLoginSuccess;
 
-  const LoginPage({
-    super.key,
-    required this.onLoginSuccess,
-  });
+  const LoginPage({super.key, required this.onLoginSuccess});
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -19,14 +17,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _resetEmailController = TextEditingController();
+  final _resetFormKey = GlobalKey<FormState>();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
-  
-  // Forgot password screen state
   bool _showForgotPassword = false;
-  final _resetEmailController = TextEditingController();
-  final _resetFormKey = GlobalKey<FormState>();
   bool _isResetLoading = false;
   bool _isResetSuccess = false;
 
@@ -41,12 +37,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
+
     try {
       await ref.read(authNotifierProvider.notifier).login(
             _emailController.text.trim(),
             _passwordController.text,
           );
-      // AuthNotifier state değişti → main.dart'taki watch() tetiklenir → MainLayout açılır
       widget.onLoginSuccess();
     } catch (e) {
       if (!mounted) return;
@@ -59,164 +55,95 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   void _handleResetRequest() {
-    if (_resetFormKey.currentState!.validate()) {
-      setState(() {
-        _isResetLoading = true;
-      });
+    if (!_resetFormKey.currentState!.validate()) return;
 
-      // Simulated network lag for password reset request
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (!mounted) return;
-        setState(() {
-          _isResetLoading = false;
-          _isResetSuccess = true;
-        });
+    setState(() => _isResetLoading = true);
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      setState(() {
+        _isResetLoading = false;
+        _isResetSuccess = true;
       });
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final size = MediaQuery.of(context).size;
-
-    final Color bgColor = isDark ? AppColors.darkBackground : AppColors.background;
-    final Color cardBgColor = isDark ? AppColors.darkSurface : Colors.white;
-    final Color textColor = isDark ? Colors.white : AppColors.textPrimary;
-    final Color subTextColor = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
-    final Color borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final Color inputBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final accent = isDark ? AppColors.warning : AppColors.primary;
 
     return Scaffold(
-      backgroundColor: bgColor,
-      body: Row(
-        children: [
-          // 1. Sol Panel: Markalama / Tanıtım (Sadece geniş ekranlarda gösterilir)
-          if (size.width > 900)
-            Expanded(
-              flex: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withValues(alpha: 0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(64.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.storage_rounded,
-                          color: Colors.white,
-                          size: 48,
-                        ),
+      backgroundColor:
+          isDark ? const Color(0xFF080A0F) : const Color(0xFFF6F8FB),
+      body: CustomPaint(
+        painter: _LoginBackdropPainter(isDark: isDark),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _BrandLockup(isDark: isDark),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xF20E1117)
+                          : const Color(0xFAFFFFFF),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.darkBorder
+                            : const Color(0xFFD9E2EC),
                       ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        'Database Management\nConsole v2.0',
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          height: 1.2,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.34 : 0.08,
+                          ),
+                          blurRadius: 34,
+                          offset: const Offset(0, 22),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Kurumsal veri kaynaklarınızı güvenle yönetin, şemaları keşfedin ve gelişmiş denetim günlüklerine tek noktadan erişin.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withValues(alpha: 0.85),
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      // Küçük Bilgi Rozetleri
-                      Row(
-                        children: [
-                          _buildIntroBadge(Icons.security, 'SSL Güvenliği'),
-                          const SizedBox(width: 16),
-                          _buildIntroBadge(Icons.speed, 'Yüksek Performans'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // 2. Sağ Panel / Giriş Kartı (Merkezi Form)
-          Expanded(
-            flex: 1,
-            child: Center(
-              child: Container(
-                width: 460,
-                margin: const EdgeInsets.all(24),
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: cardBgColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
+                      ],
                     ),
-                  ],
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _showForgotPassword
-                      ? _buildForgotPasswordView(textColor, subTextColor, inputBgColor, borderColor)
-                      : _buildLoginView(textColor, subTextColor, inputBgColor, borderColor),
-                ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: _showForgotPassword
+                          ? _buildForgotPasswordView(context, accent)
+                          : _buildLoginView(context, accent),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'TCP JSON protocol secured access',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // Tanıtım Rozeti Widget
-  Widget _buildIntroBadge(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildLoginView(BuildContext context, Color accent) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
 
-  // 2a. Giriş Ekranı Görünümü
-  Widget _buildLoginView(Color textColor, Color subTextColor, Color inputBgColor, Color borderColor) {
     return Form(
       key: _formKey,
       child: Column(
@@ -224,97 +151,36 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo & Başlık
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.admin_panel_settings_outlined,
-                    color: AppColors.primary,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Sisteme Giriş Yapın',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Devam etmek için hesap bilgilerinizi giriniz',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: subTextColor,
-                  ),
-                ),
-              ],
+          _PanelHeader(
+            eyebrow: 'AUTHENTICATION',
+            title: 'Giriş Yap',
+            subtitle: 'Yetkili kullanıcı bilgileriyle devam edin.',
+            accent: accent,
+          ),
+          const SizedBox(height: 26),
+          _LabeledField(
+            label: 'E-posta',
+            child: TextFormField(
+              controller: _emailController,
+              style: TextStyle(color: textColor),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'admin@company.com',
+                prefixIcon: Icon(Icons.alternate_email_rounded, color: muted),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'E-posta adresi boş bırakılamaz';
+                }
+                if (!value.contains('@')) return 'Geçersiz e-posta formatı';
+                return null;
+              },
             ),
           ),
-          const SizedBox(height: 36),
-
-          // E-posta Alanı
-          Text(
-            'E-posta Adresi',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _emailController,
-            style: TextStyle(color: textColor, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'ornek@sirket.com',
-              hintStyle: TextStyle(color: subTextColor, fontSize: 14),
-              prefixIcon: Icon(Icons.email_outlined, color: subTextColor, size: 20),
-              filled: true,
-              fillColor: inputBgColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-              ),
-            ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'E-posta adresi boş bırakılamaz';
-              if (!v.contains('@')) return 'Geçersiz e-posta formatı';
-              return null;
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // Şifre Alanı
+          const SizedBox(height: 18),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Şifre',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
+              const Expanded(child: Text('Şifre')),
               TextButton(
                 onPressed: () {
                   setState(() {
@@ -322,88 +188,57 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     _isResetSuccess = false;
                   });
                 },
-                child: const Text(
-                  'Şifremi Unuttum',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
+                child: const Text('Şifremi unuttum'),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
-            style: TextStyle(color: textColor, fontSize: 14),
+            style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: '••••••••',
-              hintStyle: TextStyle(color: subTextColor, fontSize: 14),
-              prefixIcon: Icon(Icons.lock_outline_rounded, color: subTextColor, size: 20),
+              prefixIcon: Icon(Icons.lock_outline_rounded, color: muted),
               suffixIcon: IconButton(
+                tooltip: _obscurePassword ? 'Şifreyi göster' : 'Şifreyi gizle',
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                  color: subTextColor,
-                  size: 20,
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: muted,
                 ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-              filled: true,
-              fillColor: inputBgColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
               ),
             ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Şifre alanı boş bırakılamaz';
-              if (v.length < 4) return 'Şifre çok kısa';
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Şifre alanı boş bırakılamaz';
+              }
+              if (value.length < 4) return 'Şifre çok kısa';
               return null;
             },
           ),
-          const SizedBox(height: 32),
-
-          // Giriş Yap Butonu
+          const SizedBox(height: 26),
           SizedBox(
             width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
+            height: 50,
+            child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _handleLogin,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
+              icon: _isLoading
                   ? const SizedBox(
-                      width: 24,
-                      height: 24,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Giriş Yap',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        strokeWidth: 2,
                         color: Colors.white,
                       ),
-                    ),
+                    )
+                  : const Icon(Icons.login_rounded, size: 18),
+              label: Text(_isLoading ? 'Doğrulanıyor' : 'Giriş Yap'),
+              style: ElevatedButton.styleFrom(backgroundColor: accent),
             ),
           ),
         ],
@@ -411,68 +246,33 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  // 2b. Şifremi Unuttum / Talep Ekranı Görünümü
-  Widget _buildForgotPasswordView(Color textColor, Color subTextColor, Color inputBgColor, Color borderColor) {
+  Widget _buildForgotPasswordView(BuildContext context, Color accent) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
+
     if (_isResetSuccess) {
       return Column(
         key: const ValueKey('reset_success'),
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check_circle_outline,
-              color: AppColors.success,
-              size: 48,
-            ),
+          Icon(Icons.mark_email_read_outlined, color: accent, size: 44),
+          const SizedBox(height: 18),
+          Text('Talep Gönderildi', style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          Text(
+            'Şifre sıfırlama yönergeleri e-posta adresinize gönderildi.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          Text(
-            'Talep Gönderildi',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Şifre sıfırlama yönergeleri e-posta adresinize başarıyla gönderildi.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: subTextColor,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 48,
             child: OutlinedButton(
-              onPressed: () {
-                setState(() {
-                  _showForgotPassword = false;
-                });
-              },
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: borderColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Giriş Ekranına Dön',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
+              onPressed: () => setState(() => _showForgotPassword = false),
+              child: const Text('Giriş Ekranına Dön'),
             ),
           ),
         ],
@@ -486,112 +286,254 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Geri Dön Butonu
           IconButton(
-            icon: Icon(Icons.arrow_back, color: textColor),
-            onPressed: () {
-              setState(() {
-                _showForgotPassword = false;
-              });
-            },
-          ),
-          const SizedBox(height: 12),
-
-          // Başlık
-          Text(
-            'Şifre Değişiklik Talebi',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: textColor,
-            ),
+            tooltip: 'Geri dön',
+            onPressed: () => setState(() => _showForgotPassword = false),
+            icon: Icon(Icons.arrow_back_rounded, color: textColor),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Hesabınıza ait e-posta adresini girdiğinizde şifre sıfırlama bağlantısı gönderilecektir.',
-            style: TextStyle(
-              fontSize: 14,
-              color: subTextColor,
-              height: 1.4,
+          _PanelHeader(
+            eyebrow: 'ACCOUNT RECOVERY',
+            title: 'Şifre Talebi',
+            subtitle: 'Kayıtlı e-posta adresinizle sıfırlama talebi oluşturun.',
+            accent: accent,
+          ),
+          const SizedBox(height: 24),
+          _LabeledField(
+            label: 'Kayıtlı e-posta',
+            child: TextFormField(
+              controller: _resetEmailController,
+              style: TextStyle(color: textColor),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'admin@company.com',
+                prefixIcon: Icon(Icons.alternate_email_rounded, color: muted),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'E-posta adresi boş bırakılamaz';
+                }
+                if (!value.contains('@')) return 'Geçersiz e-posta formatı';
+                return null;
+              },
             ),
           ),
-          const SizedBox(height: 28),
-
-          // E-posta Alanı
-          Text(
-            'Kayıtlı E-posta Adresiniz',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _resetEmailController,
-            style: TextStyle(color: textColor, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'ornek@sirket.com',
-              hintStyle: TextStyle(color: subTextColor, fontSize: 14),
-              prefixIcon: Icon(Icons.email_outlined, color: subTextColor, size: 20),
-              filled: true,
-              fillColor: inputBgColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-              ),
-            ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'E-posta adresi boş bırakılamaz';
-              if (!v.contains('@')) return 'Geçersiz e-posta formatı';
-              return null;
-            },
-          ),
-          const SizedBox(height: 32),
-
-          // Talep Gönder Butonu
+          const SizedBox(height: 26),
           SizedBox(
             width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
+            height: 50,
+            child: ElevatedButton.icon(
               onPressed: _isResetLoading ? null : _handleResetRequest,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: _isResetLoading
+              icon: _isResetLoading
                   ? const SizedBox(
-                      width: 24,
-                      height: 24,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Talebi Gönder',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        strokeWidth: 2,
                         color: Colors.white,
                       ),
-                    ),
+                    )
+                  : const Icon(Icons.send_rounded, size: 18),
+              label: Text(_isResetLoading ? 'Gönderiliyor' : 'Talebi Gönder'),
+              style: ElevatedButton.styleFrom(backgroundColor: accent),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _BrandLockup extends StatelessWidget {
+  final bool isDark;
+
+  const _BrandLockup({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+
+    return Column(
+      children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF10131A) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : const Color(0xFFD7E0EA),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.26 : 0.07),
+                blurRadius: 20,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: CustomPaint(painter: _ServerMarkPainter(accent: accent)),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Data Manager',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Secure Database Console',
+          style: TextStyle(
+            color: muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PanelHeader extends StatelessWidget {
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final Color accent;
+
+  const _PanelHeader({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(width: 24, height: 2, color: accent),
+            const SizedBox(width: 9),
+            Text(
+              eyebrow,
+              style: TextStyle(
+                color: accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 13),
+        Text(title, style: theme.textTheme.headlineMedium),
+        const SizedBox(height: 7),
+        Text(subtitle, style: theme.textTheme.bodyMedium),
+      ],
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledField({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class _LoginBackdropPainter extends CustomPainter {
+  final bool isDark;
+
+  const _LoginBackdropPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = (isDark ? Colors.white : const Color(0xFF64748B))
+          .withValues(alpha: isDark ? 0.035 : 0.045)
+      ..strokeWidth = 1;
+
+    const step = 52.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final accent = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = (isDark ? AppColors.warning : AppColors.primary)
+          .withValues(alpha: isDark ? 0.10 : 0.055);
+
+    for (double x = -size.height; x < size.width; x += 240) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        accent,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LoginBackdropPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
+  }
+}
+
+class _ServerMarkPainter extends CustomPainter {
+  final Color accent;
+
+  const _ServerMarkPainter({required this.accent});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final startY = size.height * 0.28;
+    final linePaint = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 4.2;
+
+    for (var i = 0; i < 3; i++) {
+      linePaint.color = i == 0
+          ? accent
+          : const Color(0xFF94A3B8).withValues(alpha: 0.82 - i * 0.18);
+      final y = startY + i * 10;
+      canvas.drawLine(
+        Offset(centerX - 12, y),
+        Offset(centerX + 12, y),
+        linePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ServerMarkPainter oldDelegate) {
+    return oldDelegate.accent != accent;
   }
 }
