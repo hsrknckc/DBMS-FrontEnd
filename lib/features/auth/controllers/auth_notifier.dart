@@ -8,24 +8,20 @@ import '../../../core/providers/repository_providers.dart';
 class AuthNotifier extends AsyncNotifier<AppUser?> {
   @override
   Future<AppUser?> build() async {
-    // -------------------------------------------------------------
-    // GEÇİCİ: Super Admin olarak otomatik başlat
-    // (Geri almak için bu bloğu silip alttaki satırın yorumunu kaldırın)
-    return AppUser(
-      id: 'super-admin-test',
-      name: 'Super Admin',
-      email: 'admin@company.com',
-      role: UserRole.superAdmin,
-      departments: const {'IT', 'Database Admin'},
-      permissions: Permission.values.toSet(),
-      isActive: true,
-      createdAt: DateTime.now(),
-    );
-    // -------------------------------------------------------------
-
-    // Orijinal:
-    // return ref.read(authRepositoryProvider).getCurrentUser();
+    return ref.read(authRepositoryProvider).getCurrentUser();
   }
+
+  // GEÇİCİ: Super Admin olarak otomatik başlat
+  /* return AppUser(
+  id: 'super-admin-test',
+  name: 'Super Admin',
+  email: 'admin@company.com',
+  role: UserRole.superAdmin,
+  departments: const {'IT', 'Database Admin'},
+  permissions: Permission.values.toSet(),
+  isActive: true,
+  createdAt: DateTime.now(),
+); */
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
@@ -38,7 +34,7 @@ class AuthNotifier extends AsyncNotifier<AppUser?> {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
   }
-  
+
   Future<void> requestPasswordReset(String email) async {
     await ref.read(authRepositoryProvider).requestPasswordReset(email);
   }
@@ -50,5 +46,6 @@ class AuthNotifier extends AsyncNotifier<AppUser?> {
   AppUser? get currentUser => state.valueOrNull;
 }
 
-final authNotifierProvider =
-    AsyncNotifierProvider<AuthNotifier, AppUser?>(AuthNotifier.new);
+final authNotifierProvider = AsyncNotifierProvider<AuthNotifier, AppUser?>(
+  AuthNotifier.new,
+);
