@@ -36,6 +36,9 @@ abstract class UserRepository {
     required String userId,
     required Set<String> departments,
     required Set<Permission> permissions,
+    Map<String, List<String>> allowedCollections = const {},
+    Map<String, Set<Permission>> databasePermissions = const {},
+    Map<String, Set<Permission>> collectionPermissions = const {},
   });
 
   /// Kullanıcı için şifre sıfırlama zorlar.

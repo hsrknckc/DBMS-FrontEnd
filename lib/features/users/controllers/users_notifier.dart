@@ -70,11 +70,17 @@ class UsersNotifier extends AsyncNotifier<List<AppUser>> {
     required String userId,
     required Set<String> departments,
     required Set<Permission> permissions,
+    Map<String, List<String>> allowedCollections = const {},
+    Map<String, Set<Permission>> databasePermissions = const {},
+    Map<String, Set<Permission>> collectionPermissions = const {},
   }) async {
     final updated = await ref.read(userRepositoryProvider).updatePermissions(
           userId: userId,
           departments: departments,
           permissions: permissions,
+          allowedCollections: allowedCollections,
+          databasePermissions: databasePermissions,
+          collectionPermissions: collectionPermissions,
         );
     state = AsyncData(
       (state.value ?? [])

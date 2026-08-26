@@ -42,10 +42,7 @@ class MockUserRepository implements UserRepository {
       email: 'ahmet.yildiz@company.com',
       role: UserRole.user,
       departments: const {'Signal'},
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-      },
+      permissions: const {Permission.databaseView, Permission.dataView},
       isActive: false,
       lastLoginAt: DateTime(2026, 7, 8, 10, 30),
       lastLogoutAt: DateTime(2026, 7, 8, 16, 55),
@@ -70,10 +67,7 @@ class MockUserRepository implements UserRepository {
       email: 'burak.cetin@company.com',
       role: UserRole.user,
       departments: const {'Sonar'},
-      permissions: const {
-        Permission.databaseView,
-        Permission.dataView,
-      },
+      permissions: const {Permission.databaseView, Permission.dataView},
       isActive: false,
       isDeleted: true,
       deletedAt: DateTime(2026, 7, 13, 15, 30),
@@ -166,14 +160,23 @@ class MockUserRepository implements UserRepository {
     required String userId,
     required Set<String> departments,
     required Set<Permission> permissions,
+    Map<String, List<String>> allowedCollections = const {},
+    Map<String, Set<Permission>> databasePermissions = const {},
+    Map<String, Set<Permission>> collectionPermissions = const {},
   }) async {
     await Future.delayed(const Duration(milliseconds: 400));
+
     final index = _users.indexWhere((u) => u.id == userId);
     if (index == -1) throw Exception('Kullanıcı bulunamadı: $userId');
+
     _users[index] = _users[index].copyWith(
       departments: departments,
+      allowedCollections: allowedCollections,
       permissions: permissions,
+      databasePermissions: databasePermissions,
+      collectionPermissions: collectionPermissions,
     );
+
     return _users[index];
   }
 

@@ -92,13 +92,36 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
     }).toList();
   }
 
+  int get _activeUserCount =>
+      _availableUsers.where((user) => user.isActive).length;
+
+  int get _selectedCollectionCount {
+    var count = 0;
+    for (final collections in _selectedCollections.values) {
+      count += collections.length;
+    }
+    return count;
+  }
+
+  int get _selectedDatabasePermissionCount {
+    var count = 0;
+    for (final permissions in _selectedDatabasePermissions.values) {
+      count += permissions.length;
+    }
+    return count;
+  }
+
+  int get _selectedCollectionPermissionCount {
+    var count = 0;
+    for (final permissions in _selectedCollectionPermissions.values) {
+      count += permissions.length;
+    }
+    return count;
+  }
+
   @override
   void initState() {
     super.initState();
-    final users = _availableUsers;
-    if (users.isNotEmpty) {
-      _loadUser(users.first);
-    }
   }
 
   @override
@@ -241,7 +264,7 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   Future<void> _saveChanges() async {
     final selectedUser = _selectedUser;
     if (selectedUser == null) return;
-    
+
     // Aslında ref.watch(usersProvider) ile kullanıcıları almalıyız
     final users = ref.read(usersProvider).valueOrNull ?? [];
     final index = users.indexWhere((user) => user.id == selectedUser.id);
@@ -275,13 +298,19 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
           _hasUnsavedChanges = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${selectedUser.name} için yetkiler kaydedildi.'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('${selectedUser.name} için yetkiler kaydedildi.'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata oluştu: $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text('Hata oluştu: $e'),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     }
@@ -295,12 +324,25 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final users = _availableUsers;
+
+    if (_selectedUserId == null && users.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _selectedUserId != null) return;
+        setState(() {
+          _loadUser(users.first);
+        });
+      });
+    }
+
     final selectedUser = _selectedUser;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildPageHeader(),
+        const SizedBox(height: 18),
+        _buildScopeOverview(),
         const SizedBox(height: 24),
         Expanded(
           child: LayoutBuilder(
@@ -341,19 +383,123 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   }
 
   Widget _buildPageHeader() {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Yetki Yönetimi',
-          style: Theme.of(context).textTheme.headlineLarge,
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.admin_panel_settings_outlined,
+            color: AppColors.primary,
+          ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Kullanıcıların departman erişimlerini ve işlem yetkilerini belirleyin.',
-          style: Theme.of(context).textTheme.bodyMedium,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Yetki Yönetimi',
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Kullanıcıların database, koleksiyon ve işlem kapsamlarını yönetin.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.shield_outlined, size: 17, color: AppColors.warning),
+              SizedBox(width: 8),
+              Text(
+                'Middleware enforcement bekleniyor',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildScopeOverview() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 850;
+        final tiles = [
+          _MetricTile(
+            icon: Icons.group_outlined,
+            label: 'Kullanıcı',
+            value: '${_availableUsers.length}',
+            helper: '$_activeUserCount aktif',
+            color: AppColors.primary,
+          ),
+          _MetricTile(
+            icon: Icons.apartment_outlined,
+            label: 'Database kapsamı',
+            value: '${_selectedDepartments.length}',
+            helper: 'seçili departman',
+            color: AppColors.success,
+          ),
+          _MetricTile(
+            icon: Icons.folder_copy_outlined,
+            label: 'Collection kapsamı',
+            value: '$_selectedCollectionCount',
+            helper: 'erişim verilen',
+            color: AppColors.warning,
+          ),
+          _MetricTile(
+            icon: Icons.rule_folder_outlined,
+            label: 'İşlem yetkisi',
+            value:
+                '${_selectedDatabasePermissionCount + _selectedCollectionPermissionCount}',
+            helper: 'tanımlı kural',
+            color: AppColors.danger,
+          ),
+        ];
+
+        if (isNarrow) {
+          return Column(
+            children: tiles
+                .map(
+                  (tile) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: tile,
+                  ),
+                )
+                .toList(),
+          );
+        }
+
+        return Row(
+          children: [
+            for (var i = 0; i < tiles.length; i++) ...[
+              Expanded(child: tiles[i]),
+              if (i != tiles.length - 1) const SizedBox(width: 12),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -392,7 +538,7 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
                 ),
                 const Spacer(),
                 Text(
-                  '${_availableUsers.where((user) => user.isActive).length} aktif',
+                  '$_activeUserCount aktif',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.success,
@@ -404,13 +550,38 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
           const Divider(height: 1),
           Expanded(
             child: filteredUsers.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Kullanıcı bulunamadı',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textSecondary),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.cloud_off_outlined,
+                            size: 34,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Kullanıcı bulunamadı',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _availableUsers.isEmpty
+                                ? 'Middleware bağlantısını veya kullanıcı kayıtlarını kontrol edin.'
+                                : 'Arama filtresini değiştirerek tekrar deneyin.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
@@ -566,17 +737,6 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   }
 
   Widget _buildSelectedUserSummary(AppUser user) {
-    // Toplam database yetkisi sayısı
-    int totalDbPerms = 0;
-    for (final perms in _selectedDatabasePermissions.values) {
-      totalDbPerms += perms.length;
-    }
-    // Toplam koleksiyon yetkisi sayısı
-    int totalColPerms = 0;
-    for (final perms in _selectedCollectionPermissions.values) {
-      totalColPerms += perms.length;
-    }
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -585,61 +745,97 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.10),
-            child: Text(
-              user.initials,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.name,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.10),
+                child: Text(
+                  user.initials,
                   style: const TextStyle(
-                    fontSize: 17,
+                    color: AppColors.primary,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  user.email,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusBadge(isActive: user.isActive),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _SummaryPill(
+                icon: Icons.apartment_outlined,
+                label: '${_selectedDepartments.length} database',
+              ),
+              _SummaryPill(
+                icon: Icons.folder_outlined,
+                label: '$_selectedCollectionCount collection',
+              ),
+              _SummaryPill(
+                icon: Icons.storage_outlined,
+                label: '$_selectedDatabasePermissionCount DB izni',
+              ),
+              _SummaryPill(
+                icon: Icons.table_chart_outlined,
+                label: '$_selectedCollectionPermissionCount veri izni',
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Bu ekran scoped permission payloadını hazırlar. Yetkilerin zorunlu kontrolü middleware tarafında yapılacak.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          _StatusBadge(isActive: user.isActive),
-          const SizedBox(width: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text(
-              '${_selectedDepartments.length} departman · '
-              '$totalDbPerms DB · '
-              '$totalColPerms koleksiyon yetkisi',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
             ),
           ),
         ],
@@ -1029,38 +1225,65 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   }
 
   Widget _buildSaveArea() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        if (_hasUnsavedChanges)
-          const Padding(
-            padding: EdgeInsets.only(right: 14),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, size: 17, color: AppColors.warning),
-                SizedBox(width: 6),
-                Text(
-                  'Kaydedilmemiş değişiklikler var',
-                  style: TextStyle(fontSize: 12, color: AppColors.warning),
-                ),
-              ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _hasUnsavedChanges
+              ? AppColors.warning.withValues(alpha: 0.35)
+              : AppColors.border,
+        ),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.end,
+        children: [
+          if (_hasUnsavedChanges)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, size: 17, color: AppColors.warning),
+                  SizedBox(width: 8),
+                  Text(
+                    'Kaydedilmemiş scoped permission değişiklikleri var',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ],
+              ),
             ),
+          OutlinedButton.icon(
+            onPressed: _hasUnsavedChanges ? _cancelChanges : null,
+            icon: const Icon(Icons.undo_outlined),
+            label: const Text('İptal Et'),
           ),
-        OutlinedButton(
-          onPressed: _hasUnsavedChanges ? _cancelChanges : null,
-          child: const Text('Değişiklikleri İptal Et'),
-        ),
-        const SizedBox(width: 12),
-        ElevatedButton.icon(
-          onPressed: _hasUnsavedChanges ? _saveChanges : null,
-          icon: const Icon(Icons.save_outlined),
-          label: const Text('Yetkileri Kaydet'),
-        ),
-      ],
+          ElevatedButton.icon(
+            onPressed: _hasUnsavedChanges ? _saveChanges : null,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Yetkileri Kaydet'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildNoUserSelected() {
+    final hasUsers = _availableUsers.isNotEmpty;
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -1069,31 +1292,39 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Center(
+      child: Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.person_search_outlined,
-                size: 48,
+                hasUsers
+                    ? Icons.person_search_outlined
+                    : Icons.cloud_off_outlined,
+                size: 52,
                 color: AppColors.textSecondary,
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
-                'Bir kullanıcı seçin',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
+                hasUsers ? 'Bir kullanıcı seçin' : 'Kullanıcı kaynağı boş',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
-                'Departman ve yetki ayarlarını görmek için soldaki listeden kullanıcı seçin.',
+                hasUsers
+                    ? 'Database ve koleksiyon kapsamını düzenlemek için soldaki listeden kullanıcı seçin.'
+                    : 'Middleware bağlantısı aktif değilse veya kullanıcı kayıtları gelmediyse burada düzenleme yapılamaz.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -1149,6 +1380,123 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
       case Permission.dataImport:
         return 'Koleksiyona veri içe aktarabilir.';
     }
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String helper;
+  final Color color;
+
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.helper,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        helper,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _SummaryPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -111,7 +111,9 @@ class TcpUserRepository implements UserRepository {
           email: email,
           role: UserRole.user,
           departments: departments.isEmpty ? {'General'} : departments,
-          permissions: permissions.isEmpty ? Permission.values.toSet() : permissions,
+          permissions: permissions.isEmpty
+              ? Permission.values.toSet()
+              : permissions,
           isActive: true,
           createdAt: DateTime.now(),
         );
@@ -123,7 +125,9 @@ class TcpUserRepository implements UserRepository {
         email: email,
         role: UserRole.user,
         departments: departments.isEmpty ? {'General'} : departments,
-        permissions: permissions.isEmpty ? Permission.values.toSet() : permissions,
+        permissions: permissions.isEmpty
+            ? Permission.values.toSet()
+            : permissions,
         isActive: true,
         createdAt: DateTime.now(),
       );
@@ -145,7 +149,9 @@ class TcpUserRepository implements UserRepository {
       document: _serializeUser(user),
     );
 
-    final index = _localUsers.indexWhere((u) => u.id == user.id || u.email == user.email);
+    final index = _localUsers.indexWhere(
+      (u) => u.id == user.id || u.email == user.email,
+    );
     if (index != -1) {
       _localUsers[index] = user;
     }
@@ -201,6 +207,9 @@ class TcpUserRepository implements UserRepository {
     required String userId,
     required Set<String> departments,
     required Set<Permission> permissions,
+    Map<String, List<String>> allowedCollections = const {},
+    Map<String, Set<Permission>> databasePermissions = const {},
+    Map<String, Set<Permission>> collectionPermissions = const {},
   }) async {
     final c = _getCreds();
 
@@ -211,16 +220,25 @@ class TcpUserRepository implements UserRepository {
       filter: {'id': userId},
       document: {
         'departments': departments.toList(),
+        'allowedCollections': allowedCollections,
         'permissions': permissions.map((p) => p.name).toList(),
+        'databasePermissions': _serializePermissionMap(databasePermissions),
+        'collectionPermissions': _serializePermissionMap(collectionPermissions),
       },
     );
 
-    final index = _localUsers.indexWhere((u) => u.id == userId || u.email == userId);
+    final index = _localUsers.indexWhere(
+      (u) => u.id == userId || u.email == userId,
+    );
+
     AppUser updated;
     if (index != -1) {
       updated = _localUsers[index].copyWith(
         departments: departments,
+        allowedCollections: allowedCollections,
         permissions: permissions,
+        databasePermissions: databasePermissions,
+        collectionPermissions: collectionPermissions,
       );
       _localUsers[index] = updated;
     } else {
@@ -230,7 +248,10 @@ class TcpUserRepository implements UserRepository {
         email: userId,
         role: UserRole.user,
         departments: departments,
+        allowedCollections: allowedCollections,
         permissions: permissions,
+        databasePermissions: databasePermissions,
+        collectionPermissions: collectionPermissions,
         isActive: true,
       );
       _localUsers.add(updated);
@@ -250,21 +271,69 @@ class TcpUserRepository implements UserRepository {
     );
   }
 
+  Set<Permission> _parsePermissions(dynamic raw) {
+    if (raw is! List) return {};
+
+    return raw.map((item) => item.toString()).map((value) {
+      return Permission.values.firstWhere(
+        (p) => p.name == value || p.code == value,
+        orElse: () => Permission.databaseView,
+      );
+    }).toSet();
+  }
+
+  Map<String, List<String>> _parseStringListMap(dynamic raw) {
+    final result = <String, List<String>>{};
+    if (raw is! Map) return result;
+
+    raw.forEach((key, value) {
+      if (value is List) {
+        result[key.toString()] = value.map((item) => item.toString()).toList();
+      }
+    });
+
+    return result;
+  }
+
+  Map<String, Set<Permission>> _parsePermissionMap(dynamic raw) {
+    final result = <String, Set<Permission>>{};
+    if (raw is! Map) return result;
+
+    raw.forEach((key, value) {
+      result[key.toString()] = _parsePermissions(value);
+    });
+
+    return result;
+  }
+
+  Map<String, List<String>> _serializePermissionMap(
+    Map<String, Set<Permission>> permissions,
+  ) {
+    return permissions.map(
+      (key, value) =>
+          MapEntry(key, value.map((permission) => permission.name).toList()),
+    );
+  }
+
   // ── Yardımcılar ─────────────────────────────────────────────────────────
 
   AppUser _parseUser(Map<String, dynamic> data) {
-    final roleStr = data['role'] as String? ?? 'user';
-    final role = roleStr == 'superAdmin' ? UserRole.superAdmin : UserRole.user;
-    final permList = (data['permissions'] as List<dynamic>? ?? []).cast<String>();
-    final permissions = permList.isEmpty
-        ? Permission.values.toSet()
-        : permList
-            .map((p) => Permission.values.firstWhere(
-                  (e) => e.name == p,
-                  orElse: () => Permission.databaseView,
-                ))
-            .toSet();
-    final deptList = (data['departments'] as List<dynamic>? ?? []).cast<String>();
+    final roleStr = data['role']?.toString() ?? 'user';
+    final role = roleStr == 'superAdmin' || roleStr == 'SUPER_ADMIN'
+        ? UserRole.superAdmin
+        : UserRole.user;
+
+    final permissions = _parsePermissions(data['permissions']);
+    final deptList = (data['departments'] as List<dynamic>? ?? [])
+        .cast<String>();
+
+    final allowedCollections = _parseStringListMap(data['allowedCollections']);
+    final databasePermissions = _parsePermissionMap(
+      data['databasePermissions'],
+    );
+    final collectionPermissions = _parsePermissionMap(
+      data['collectionPermissions'],
+    );
 
     return AppUser(
       id: data['_id']?.toString() ?? data['id']?.toString() ?? '',
@@ -272,6 +341,9 @@ class TcpUserRepository implements UserRepository {
       email: data['email'] as String? ?? '',
       role: role,
       departments: deptList.isEmpty ? {'General'} : deptList.toSet(),
+      allowedCollections: allowedCollections,
+      databasePermissions: databasePermissions,
+      collectionPermissions: collectionPermissions,
       permissions: permissions,
       isActive: data['isActive'] as bool? ?? true,
       createdAt: data['createdAt'] != null
@@ -281,12 +353,17 @@ class TcpUserRepository implements UserRepository {
   }
 
   Map<String, dynamic> _serializeUser(AppUser user) => {
-        'id': user.id,
-        'name': user.name,
-        'email': user.email,
-        'role': user.role.name,
-        'departments': user.departments.toList(),
-        'permissions': user.permissions.map((p) => p.name).toList(),
-        'isActive': user.isActive,
-      };
+    'id': user.id,
+    'name': user.name,
+    'email': user.email,
+    'role': user.role.name,
+    'departments': user.departments.toList(),
+    'allowedCollections': user.allowedCollections,
+    'permissions': user.permissions.map((p) => p.name).toList(),
+    'databasePermissions': _serializePermissionMap(user.databasePermissions),
+    'collectionPermissions': _serializePermissionMap(
+      user.collectionPermissions,
+    ),
+    'isActive': user.isActive,
+  };
 }

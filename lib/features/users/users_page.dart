@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
-import '../../models/permission.dart';
 import 'controllers/users_notifier.dart';
 
 class UsersPage extends ConsumerStatefulWidget {
@@ -514,26 +513,29 @@ class _UsersPageState extends ConsumerState<UsersPage> {
     );
   }
 
-  void _toggleUserStatus(AppUser user) {
-    final index = _users.indexWhere((item) => item.id == user.id);
-
-    if (index == -1 || user.isDeleted) {
+  Future<void> _toggleUserStatus(AppUser user) async {
+    if (user.isDeleted) {
       return;
     }
 
-    setState(() {
-      _users[index] = user.copyWith(isActive: !user.isActive);
-    });
+    try {
+      await ref
+          .read(usersProvider.notifier)
+          .updateUser(user.copyWith(isActive: !user.isActive));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          user.isActive
-              ? '${user.name} pasif duruma getirildi.'
-              : '${user.name} aktif duruma getirildi.',
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            user.isActive
+                ? '${user.name} pasif duruma getirildi.'
+                : '${user.name} aktif duruma getirildi.',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      _showActionError('Kullanıcı durumu güncellenemedi', e);
+    }
   }
 
   Future<void> _showSoftDeleteDialog(AppUser user) async {
@@ -590,36 +592,24 @@ class _UsersPageState extends ConsumerState<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere((item) => item.id == user.id);
+    try {
+      await ref.read(usersProvider.notifier).softDelete(user.id);
 
-    if (index == -1) {
-      return;
-    }
-
-    setState(() {
-      _users[index] = user.copyWith(
-        isDeleted: true,
-        isActive: false,
-        deletedAt: DateTime.now(),
-        deletedBy: 'super-admin-1',
-      );
-    });
-
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${user.name} silinen kullanıcılar bölümüne taşındı.'),
-        action: SnackBarAction(
-          label: 'Geri Al',
-          onPressed: () {
-            _restoreUser(user.id);
-          },
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${user.name} silinen kullanıcılar bölümüne taşındı.'),
+          action: SnackBarAction(
+            label: 'Geri Al',
+            onPressed: () {
+              _restoreUser(user.id);
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      _showActionError('Kullanıcı silinemedi', e);
+    }
   }
 
   Future<void> _showRestoreUserDialog(AppUser user) async {
@@ -655,31 +645,25 @@ class _UsersPageState extends ConsumerState<UsersPage> {
     }
   }
 
-  void _restoreUser(String userId) {
-    final index = _users.indexWhere((item) => item.id == userId);
-
-    if (index == -1) {
-      return;
+  Future<void> _restoreUser(String userId) async {
+    AppUser? user;
+    for (final item in _users) {
+      if (item.id == userId) {
+        user = item;
+        break;
+      }
     }
 
-    final user = _users[index];
+    try {
+      await ref.read(usersProvider.notifier).restore(userId);
 
-    setState(() {
-      _users[index] = user.copyWith(
-        isDeleted: false,
-        isActive: true,
-        clearDeletedAt: true,
-        clearDeletedBy: true,
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${user?.name ?? 'Kullanıcı'} geri yüklendi.')),
       );
-    });
-
-    if (!mounted) {
-      return;
+    } catch (e) {
+      _showActionError('Kullanıcı geri yüklenemedi', e);
     }
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('${user.name} geri yüklendi.')));
   }
 
   Future<void> _showPermanentDeleteDialog(AppUser user) async {
@@ -764,17 +748,16 @@ class _UsersPageState extends ConsumerState<UsersPage> {
       return;
     }
 
-    setState(() {
-      _users.removeWhere((item) => item.id == user.id);
-    });
+    try {
+      await ref.read(usersProvider.notifier).permanentlyDelete(user.id);
 
-    if (!mounted) {
-      return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${user.name} kalıcı olarak silindi.')),
+      );
+    } catch (e) {
+      _showActionError('Kullanıcı kalıcı olarak silinemedi', e);
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${user.name} kalıcı olarak silindi.')),
-    );
   }
 
   Future<void> _showPasswordResetDialog(AppUser user) async {
@@ -853,102 +836,202 @@ class _UsersPageState extends ConsumerState<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere((item) => item.id == user.id);
+    try {
+      await ref.read(usersProvider.notifier).forcePasswordReset(user.id);
 
-    if (index == -1) {
-      return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${user.name} için şifre yenileme zorlandı.')),
+      );
+    } catch (e) {
+      _showActionError('Şifre yenileme başlatılamadı', e);
     }
-
-    setState(() {
-      _users[index] = user.copyWith(mustChangePassword: true);
-    });
   }
 
   Future<void> _showAddUserDialog() async {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
+    final passwordController = TextEditingController(
+      text: 'TemporaryPassword123!',
+    );
+    bool obscurePassword = true;
+    bool isSubmitting = false;
 
     await showDialog(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Yeni kullanıcı ekle'),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Ad soyad',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Yeni kullanıcı ekle'),
+              content: SizedBox(
+                width: 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Ad soyad',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'E-posta',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Geçici şifre',
+                        helperText:
+                            'Kullanıcı ilk girişten sonra değiştirebilir.',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Departman ve scoped permission ayarları Permissions ekranından atanacaktır.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'E-posta',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: const Text('İptal'),
                 ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Departman ve yetkiler Permissions ekranından atanacaktır.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                ElevatedButton.icon(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final name = nameController.text.trim();
+                          final email = emailController.text.trim();
+                          final password = passwordController.text.trim();
+
+                          if (name.isEmpty ||
+                              email.isEmpty ||
+                              password.isEmpty) {
+                            _showActionError(
+                              'Kullanıcı eklenemedi',
+                              'Ad soyad, e-posta ve geçici şifre zorunludur.',
+                            );
+                            return;
+                          }
+
+                          if (!_looksLikeEmail(email)) {
+                            _showActionError(
+                              'Kullanıcı eklenemedi',
+                              'Geçerli bir e-posta adresi girin.',
+                            );
+                            return;
+                          }
+
+                          if (password.length < 8) {
+                            _showActionError(
+                              'Kullanıcı eklenemedi',
+                              'Geçici şifre en az 8 karakter olmalıdır.',
+                            );
+                            return;
+                          }
+
+                          setDialogState(() {
+                            isSubmitting = true;
+                          });
+
+                          try {
+                            await ref.read(usersProvider.notifier).createUser(
+                                  name: name,
+                                  email: email,
+                                  password: password,
+                                );
+
+                            if (mounted) {
+                              Navigator.of(dialogContext).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Kullanıcı başarıyla eklendi.'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                            });
+                            _showActionError('Kullanıcı eklenemedi', e);
+                          }
+                        },
+                  icon: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_1_outlined),
+                  label: Text(isSubmitting ? 'Ekleniyor...' : 'Kullanıcı Ekle'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final email = emailController.text.trim();
-
-                if (name.isEmpty || email.isEmpty) {
-                  return;
-                }
-
-                try {
-                  await ref.read(usersProvider.notifier).createUser(
-                        name: name,
-                        email: email,
-                        password: 'TemporaryPassword123!', // Sunucu tarafında değiştirilmesi gerekebilir
-                      );
-                  if (mounted) {
-                    Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Kullanıcı başarıyla eklendi.'), backgroundColor: Colors.green),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Hata: $e'), backgroundColor: AppColors.danger),
-                    );
-                  }
-                }
-              },
-              child: const Text('Kullanıcı Ekle'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
 
     nameController.dispose();
     emailController.dispose();
+    passwordController.dispose();
   }
 
   Future<void> _showEditUserDialog(AppUser user) async {
@@ -1018,15 +1101,40 @@ class _UsersPageState extends ConsumerState<UsersPage> {
       return;
     }
 
-    final index = _users.indexWhere((item) => item.id == user.id);
-
-    if (index == -1) {
+    if (!_looksLikeEmail(result.email)) {
+      _showActionError(
+        'Kullanıcı güncellenemedi',
+        'Geçerli bir e-posta adresi girin.',
+      );
       return;
     }
 
-    setState(() {
-      _users[index] = result;
-    });
+    try {
+      await ref.read(usersProvider.notifier).updateUser(result);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${result.name} güncellendi.')),
+      );
+    } catch (e) {
+      _showActionError('Kullanıcı güncellenemedi', e);
+    }
+  }
+
+  bool _looksLikeEmail(String value) {
+    final trimmed = value.trim();
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed);
+  }
+
+  void _showActionError(String title, Object error) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.danger,
+        content: Text('$title: $error'),
+      ),
+    );
   }
 
   String _formatDateTime(DateTime? dateTime) {

@@ -68,9 +68,19 @@ class HttpUserRepository implements UserRepository {
     required String userId,
     required Set<String> departments,
     required Set<Permission> permissions,
+    Map<String, List<String>> allowedCollections = const {},
+    Map<String, Set<Permission>> databasePermissions = const {},
+    Map<String, Set<Permission>> collectionPermissions = const {},
   }) async {
     // TODO: PATCH /users/:id/permissions
-    // İstek gövdesi: {"departments": [...], "permissions": [...]}
+    // İstek gövdesi:
+    // {
+    //   "departments": [...],
+    //   "allowedCollections": {...},
+    //   "permissions": [...],
+    //   "databasePermissions": {...},
+    //   "collectionPermissions": {...}
+    // }
     throw UnimplementedError('HttpUserRepository.updatePermissions');
   }
 
