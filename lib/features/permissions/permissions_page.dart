@@ -16,6 +16,7 @@ class PermissionsPage extends ConsumerStatefulWidget {
 
 class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   static const List<String> _availableDepartments = [
+    'General',
     'Sensor',
     'Signal',
     'Acoustic',
@@ -24,6 +25,7 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
   ];
 
   static const Map<String, List<String>> _departmentCollections = {
+    'General': ['general_records'],
     'Sensor': ['sensor_readings', 'sensor_status', 'device_logs'],
     'Signal': ['signal_records', 'signal_analysis'],
     'Acoustic': ['acoustic_logs', 'acoustic_data'],
@@ -420,7 +422,9 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
           decoration: BoxDecoration(
             color: AppColors.warning.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+            border: Border.all(
+              color: AppColors.warning.withValues(alpha: 0.25),
+            ),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
@@ -823,7 +827,11 @@ class _PermissionsPageState extends ConsumerState<PermissionsPage> {
             ),
             child: const Row(
               children: [
-                Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
+                Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
