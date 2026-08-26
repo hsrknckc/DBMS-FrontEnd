@@ -5,6 +5,7 @@ import 'sections/appearance_section.dart';
 import 'sections/notification_section.dart';
 import 'sections/security_section.dart';
 import 'sections/about_section.dart';
+import '../../core/theme/app_colors.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -27,16 +28,23 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final pageBg =
+        isDark ? Colors.transparent : theme.scaffoldBackgroundColor;
+    final selectedColor = isDark ? AppColors.warning : AppColors.primary;
+    final textColor = isDark ? AppColors.darkTextSecondary : AppColors.textSecondary;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Modern açık gri/mavi tonlu arka plan
+      backgroundColor: Colors.transparent,
       body: Row(
         children: [
-          // Sol Bölüm: Ayarlar Navigasyon Menüsü
           Container(
             width: 250,
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Colors.grey.shade200)),
+              color: surface.withValues(alpha: isDark ? 0.82 : 0.94),
+              border: Border(right: BorderSide(color: theme.dividerColor)),
             ),
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
@@ -51,14 +59,16 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue.shade50 : Colors.transparent,
+                        color: isSelected
+                            ? selectedColor.withValues(alpha: isDark ? 0.14 : 0.10)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             _tabs[index]['icon'],
-                            color: isSelected ? Colors.blueAccent.shade700 : Colors.grey.shade600,
+                            color: isSelected ? selectedColor : textColor,
                             size: 20,
                           ),
                           const SizedBox(width: 12),
@@ -67,7 +77,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected ? Colors.blueAccent.shade700 : Colors.grey.shade700,
+                              color: isSelected ? selectedColor : textColor,
                             ),
                           ),
                         ],
@@ -78,11 +88,9 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
-          
-          // Sağ Bölüm: Seçili Sekmenin Detay Sayfası
           Expanded(
             child: Container(
-              color: const Color(0xFFF8FAFC),
+              color: pageBg,
               child: _tabs[_activeTab]['widget'],
             ),
           ),

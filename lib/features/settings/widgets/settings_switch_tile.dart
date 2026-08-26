@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 
 class SettingsSwitchTile extends StatelessWidget {
   final IconData icon;
@@ -18,30 +19,36 @@ class SettingsSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Masaüstünde Switch'in doğru render edilmesi için mutlaka Material widget'ı altında olmalıdır.
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final subtitleColor =
+        isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+
     return Material(
       color: Colors.transparent,
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF64748B)), // Slate 500 rengi
+        leading: Icon(icon, color: subtitleColor),
         title: Text(
           title, 
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600, 
             fontSize: 14,
-            color: Color(0xFF1E293B), // Koyu slate rengi
+            color: titleColor,
           ),
         ),
         subtitle: Text(
           subtitle, 
-          style: const TextStyle(
-            color: Color(0xFF94A3B8), // Açık gri/slate rengi
+          style: TextStyle(
+            color: subtitleColor,
             fontSize: 12,
           ),
         ),
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: const Color(0xFF3F51B5), // Senin uygulamanın ana mavi tonu
+          activeThumbColor: accent,
         ),
       ),
     );

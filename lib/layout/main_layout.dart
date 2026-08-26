@@ -207,7 +207,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final Color textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final Color backgroundStart =
+        isDark ? const Color(0xFF080A0F) : const Color(0xFFF8FAFC);
+    final Color backgroundEnd =
+        isDark ? const Color(0xFF141414) : const Color(0xFFEAF0F7);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -247,12 +251,26 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   },
                 ),
                 Expanded(
-                  child: Container(
-                    color: theme.scaffoldBackgroundColor,
-                    padding: const EdgeInsets.all(24.0),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 150),
-                      child: _buildPageContent(textColor),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: backgroundStart,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [backgroundStart, backgroundEnd],
+                      ),
+                    ),
+                    child: CustomPaint(
+                      painter: _WorkspaceBackdropPainter(isDark: isDark),
+                      child: Padding(
+                        padding: EdgeInsets.all(isDesktop ? 28.0 : 18.0),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          child: _buildPageContent(textColor),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -284,5 +302,45 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       case AppPage.settings:
         return const SettingsPage();
     }
+  }
+}
+
+class _WorkspaceBackdropPainter extends CustomPainter {
+  final bool isDark;
+
+  const _WorkspaceBackdropPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = (isDark ? Colors.white : const Color(0xFF64748B))
+          .withValues(alpha: isDark ? 0.035 : 0.055)
+      ..strokeWidth = 1;
+
+    const step = 44.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    final diagonalPaint = Paint()
+      ..color = (isDark ? AppColors.warning : AppColors.primary)
+          .withValues(alpha: isDark ? 0.055 : 0.04)
+      ..strokeWidth = 1.2;
+
+    for (double x = -size.height; x < size.width; x += 180) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        diagonalPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WorkspaceBackdropPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
   }
 }

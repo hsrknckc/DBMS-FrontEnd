@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../databases/controllers/databases_notifier.dart';
@@ -8,268 +9,249 @@ import '../users/controllers/users_notifier.dart';
 class DashboardPage extends ConsumerWidget {
   final AppUser? currentUser;
 
-  const DashboardPage({
-    super.key,
-    this.currentUser,
-  });
+  const DashboardPage({super.key, this.currentUser});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final dbs = ref.watch(databasesProvider).valueOrNull ?? [];
+    final users = ref.watch(usersProvider).valueOrNull ?? [];
 
-    // Dinamik Tema Renkleri
-    final Color boxBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final Color borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final Color titleColor = isDark ? Colors.white : const Color(0xFF1E293B);
-    final Color subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    var totalCollections = 0;
+    var totalRecords = 0;
+    for (final db in dbs) {
+      totalCollections += db.collectionCount;
+      totalRecords += db.recordCount;
+    }
+
+    final activeUsers = users.where((user) => user.isActive).length;
+    final stats = [
+      _StatItem('Databases', dbs.length.toString(), Icons.dns_rounded),
+      _StatItem('Collections', totalCollections.toString(), Icons.folder_rounded),
+      _StatItem('Records', totalRecords.toString(), Icons.view_list_rounded),
+      _StatItem('Active Users', activeUsers.toString(), Icons.groups_rounded),
+    ];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildWelcomeSection(context, titleColor, subtitleColor),
-          const SizedBox(height: 24),
-          _buildStatCards(ref, boxBgColor, borderColor, titleColor, subtitleColor),
-          const SizedBox(height: 24),
-          _buildBottomSection(context, boxBgColor, borderColor, titleColor, subtitleColor, isDark),
+          _HeroPanel(
+            userName: currentUser?.name ?? 'Kullanıcı',
+            stats: stats,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 22),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 1050;
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    _OperationsPanel(isDark: isDark),
+                    const SizedBox(height: 18),
+                    _SystemPanel(isDark: isDark),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 7, child: _OperationsPanel(isDark: isDark)),
+                  const SizedBox(width: 18),
+                  Expanded(flex: 4, child: _SystemPanel(isDark: isDark)),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildWelcomeSection(BuildContext context, Color titleColor, Color subtitleColor) {
-    final userName = currentUser?.name ?? 'Kullanıcı';
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hoş geldiniz, $userName',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: titleColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Sisteminizdeki database, collection ve kullanıcı hareketlerini buradan takip edebilirsiniz.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: subtitleColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCards(WidgetRef ref, Color boxBgColor, Color borderColor, Color titleColor, Color subtitleColor) {
-    final dbsAsync = ref.watch(databasesProvider);
-    final usersAsync = ref.watch(usersProvider);
-
-    final dbs = dbsAsync.valueOrNull ?? [];
-    final users = usersAsync.valueOrNull ?? [];
-
-    final totalDbs = dbs.length;
-    int totalCols = 0;
-    int totalRecs = 0;
-
-    for (final db in dbs) {
-      totalCols += db.collectionCount;
-      totalRecs += db.recordCount;
-    }
-
-    final activeUsers = users.where((u) => u.isActive).length;
-
-    final stats = [
-      _StatItem(
-        title: 'Toplam Database',
-        value: totalDbs.toString(),
-        icon: Icons.storage_outlined,
-      ),
-      _StatItem(
-        title: 'Toplam Collection',
-        value: totalCols.toString(),
-        icon: Icons.folder_copy_outlined,
-      ),
-      _StatItem(
-        title: 'Toplam Kayıt',
-        value: totalRecs.toString(),
-        icon: Icons.table_rows_outlined,
-      ),
-      _StatItem(
-        title: 'Aktif Kullanıcı',
-        value: activeUsers.toString(),
-        icon: Icons.people_outline,
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - 48) / 4;
-
-        return Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: stats.map((item) {
-            return SizedBox(
-              width: cardWidth < 240 ? 240 : cardWidth,
-              child: _StatCard(
-                item: item,
-                boxBgColor: boxBgColor,
-                borderColor: borderColor,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildBottomSection(
-    BuildContext context,
-    Color boxBgColor,
-    Color borderColor,
-    Color titleColor,
-    Color subtitleColor,
-    bool isDark,
-  ) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 1000;
-
-        if (isNarrow) {
-          return Column(
-            children: [
-              _RecentActivityCard(
-                boxBgColor: boxBgColor,
-                borderColor: borderColor,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
-                isDark: isDark,
-              ),
-              const SizedBox(height: 24),
-              _SystemStatusCard(
-                boxBgColor: boxBgColor,
-                borderColor: borderColor,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
-                isDark: isDark,
-              ),
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3,
-              child: _RecentActivityCard(
-                boxBgColor: boxBgColor,
-                borderColor: borderColor,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
-                isDark: isDark,
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              flex: 2,
-              child: _SystemStatusCard(
-                boxBgColor: boxBgColor,
-                borderColor: borderColor,
-                titleColor: titleColor,
-                subtitleColor: subtitleColor,
-                isDark: isDark,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
-class _StatItem {
-  final String title;
-  final String value;
-  final IconData icon;
+class _HeroPanel extends StatelessWidget {
+  final String userName;
+  final List<_StatItem> stats;
+  final bool isDark;
 
-  const _StatItem({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-}
-
-class _StatCard extends StatelessWidget {
-  final _StatItem item;
-  final Color boxBgColor;
-  final Color borderColor;
-  final Color titleColor;
-  final Color subtitleColor;
-
-  const _StatCard({
-    required this.item,
-    required this.boxBgColor,
-    required this.borderColor,
-    required this.titleColor,
-    required this.subtitleColor,
+  const _HeroPanel({
+    required this.userName,
+    required this.stats,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final panelColor =
+        isDark ? const Color(0xE60E1117) : const Color(0xF7FFFFFF);
+    final borderColor =
+        isDark ? AppColors.darkBorder : const Color(0xFFD8E0EA);
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: boxBgColor,
-        borderRadius: BorderRadius.circular(16),
+        color: panelColor,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _CircuitPainter(isDark))),
+            Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionLabel(
+                              label: 'DATABASE COMMAND CENTER',
+                              color: accent,
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Hoş geldiniz, $userName',
+                              style: theme.textTheme.headlineLarge?.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 760),
+                              child: Text(
+                                'Database, collection ve kullanıcı hareketlerini tek merkezden izleyin.',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.textSecondary,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _SignalBadge(isDark: isDark),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 900;
+                      if (compact) {
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: stats
+                              .map((item) => SizedBox(
+                                    width: 210,
+                                    child: _MetricTile(item: item, isDark: isDark),
+                                  ))
+                              .toList(),
+                        );
+                      }
+                      return Row(
+                        children: [
+                          for (var i = 0; i < stats.length; i++) ...[
+                            Expanded(
+                              child: _MetricTile(item: stats[i], isDark: isDark),
+                            ),
+                            if (i != stats.length - 1) const SizedBox(width: 12),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final _StatItem item;
+  final bool isDark;
+
+  const _MetricTile({required this.item, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+    return Container(
+      height: 104,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.045)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : const Color(0xFFDCE3EC),
+        ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: accent.withValues(alpha: isDark ? 0.14 : 0.10),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              item.icon,
-              color: AppColors.primary,
-              size: 24,
-            ),
+            child: Icon(item.icon, color: accent, size: 21),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: subtitleColor,
+                    color: isDark
+                        ? AppColors.darkTextMuted
+                        : AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   item.value,
                   style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: titleColor,
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -281,49 +263,88 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _RecentActivityCard extends StatelessWidget {
-  final Color boxBgColor;
-  final Color borderColor;
-  final Color titleColor;
-  final Color subtitleColor;
+class _OperationsPanel extends StatelessWidget {
   final bool isDark;
 
-  const _RecentActivityCard({
-    required this.boxBgColor,
-    required this.borderColor,
-    required this.titleColor,
-    required this.subtitleColor,
-    required this.isDark,
-  });
+  const _OperationsPanel({required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: boxBgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Son Hareketler',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: titleColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Text(
-                'Henüz hareket kaydı yok',
-                style: TextStyle(color: AppColors.textSecondary),
+    return _PanelShell(
+      isDark: isDark,
+      title: 'Son Hareketler',
+      icon: Icons.timeline_rounded,
+      child: SizedBox(
+        height: 245,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.radar_rounded,
+                size: 42,
+                color: (isDark ? AppColors.warning : AppColors.primary)
+                    .withValues(alpha: 0.72),
               ),
+              const SizedBox(height: 12),
+              Text(
+                'Henüz hareket kaydı yok',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemPanel extends StatelessWidget {
+  final bool isDark;
+
+  const _SystemPanel({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelShell(
+      isDark: isDark,
+      title: 'Sistem Durumu',
+      icon: Icons.health_and_safety_rounded,
+      child: Column(
+        children: [
+          _StatusRow(
+            label: 'TCP Soket Bağlantısı',
+            value: 'Aktif',
+            icon: Icons.settings_input_antenna_rounded,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 12),
+          _StatusRow(
+            label: 'MongoDB Servisi',
+            value: 'Bağlı',
+            icon: Icons.dataset_linked_rounded,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 18),
+          Container(
+            height: 92,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.22)
+                  : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.border,
+              ),
+            ),
+            child: CustomPaint(
+              painter: _MiniGraphPainter(isDark),
+              child: const SizedBox.expand(),
             ),
           ),
         ],
@@ -332,74 +353,275 @@ class _RecentActivityCard extends StatelessWidget {
   }
 }
 
-class _SystemStatusCard extends StatelessWidget {
-  final Color boxBgColor;
-  final Color borderColor;
-  final Color titleColor;
-  final Color subtitleColor;
+class _PanelShell extends StatelessWidget {
+  final bool isDark;
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  const _PanelShell({
+    required this.isDark,
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xE60E1117) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFD8E0EA),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.055),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: accent, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
   final bool isDark;
 
-  const _SystemStatusCard({
-    required this.boxBgColor,
-    required this.borderColor,
-    required this.titleColor,
-    required this.subtitleColor,
+  const _StatusRow({
+    required this.label,
+    required this.value,
+    required this.icon,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: boxBgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.045)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'Sistem Durumu',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: titleColor,
+          Icon(icon, color: AppColors.success, size: 20),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          _buildStatusRow('TCP Soket Bağlantısı', true, 'Aktif (54.154.220.190:5150)'),
-          const SizedBox(height: 12),
-          _buildStatusRow('MongoDB Servisi', true, 'Bağlı'),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.success,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStatusRow(String label, bool isOk, String statusText) {
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SectionLabel({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          isOk ? Icons.check_circle_outline : Icons.error_outline,
-          color: isOk ? AppColors.success : AppColors.danger,
-          size: 20,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 14, color: titleColor),
-          ),
-        ),
+        Container(width: 26, height: 2, color: color),
+        const SizedBox(width: 9),
         Text(
-          statusText,
+          label,
           style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: isOk ? AppColors.success : AppColors.danger,
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
           ),
         ),
       ],
     );
+  }
+}
+
+class _SignalBadge extends StatelessWidget {
+  final bool isDark;
+
+  const _SignalBadge({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDark ? AppColors.warning : AppColors.accent;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bolt_rounded, size: 16, color: color),
+          const SizedBox(width: 7),
+          Text(
+            'LIVE',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem {
+  final String title;
+  final String value;
+  final IconData icon;
+
+  const _StatItem(this.title, this.value, this.icon);
+}
+
+class _CircuitPainter extends CustomPainter {
+  final bool isDark;
+
+  const _CircuitPainter(this.isDark);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = (isDark ? AppColors.warning : AppColors.primary)
+          .withValues(alpha: isDark ? 0.10 : 0.07);
+
+    for (var i = 0; i < 8; i++) {
+      final y = 28.0 + i * 28;
+      final startX = size.width * 0.58 + (i.isEven ? 0 : 34);
+      canvas.drawLine(Offset(startX, y), Offset(size.width - 36, y), paint);
+      canvas.drawCircle(Offset(startX, y), 2.5, paint);
+      canvas.drawCircle(Offset(size.width - 36, y), 2.5, paint);
+    }
+
+    final fill = Paint()
+      ..style = PaintingStyle.fill
+      ..color = (isDark ? AppColors.accent : AppColors.accent)
+          .withValues(alpha: isDark ? 0.10 : 0.08);
+
+    final path = Path()
+      ..moveTo(size.width * 0.70, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(size.width * 0.82, size.height)
+      ..close();
+    canvas.drawPath(path, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircuitPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
+  }
+}
+
+class _MiniGraphPainter extends CustomPainter {
+  final bool isDark;
+
+  const _MiniGraphPainter(this.isDark);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grid = Paint()
+      ..color = (isDark ? Colors.white : AppColors.textSecondary)
+          .withValues(alpha: isDark ? 0.055 : 0.09)
+      ..strokeWidth = 1;
+    for (double x = 14; x < size.width; x += 32) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+
+    final line = Paint()
+      ..color = isDark ? AppColors.warning : AppColors.primary
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(14, size.height * 0.68)
+      ..cubicTo(
+        size.width * 0.25,
+        size.height * 0.22,
+        size.width * 0.42,
+        size.height * 0.82,
+        size.width * 0.62,
+        size.height * 0.38,
+      )
+      ..cubicTo(
+        size.width * 0.74,
+        size.height * 0.12,
+        size.width * 0.86,
+        size.height * 0.48,
+        size.width - 14,
+        size.height * 0.24,
+      );
+    canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniGraphPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
   }
 }

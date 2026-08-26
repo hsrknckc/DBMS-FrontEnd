@@ -389,9 +389,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -565,9 +565,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -678,9 +678,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -702,9 +702,7 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
               child: SingleChildScrollView(
                 controller: _tableVerticalScrollController,
                 child: DataTable(
-                headingRowColor: const WidgetStatePropertyAll(
-                  AppColors.background,
-                ),
+                headingRowColor: WidgetStatePropertyAll(Theme.of(context).scaffoldBackgroundColor),
                 columns: [
                   const DataColumn(
                     label: Text(
@@ -816,9 +814,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -836,9 +834,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.background,
+              color: Theme.of(context).scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1111,9 +1109,9 @@ class _DataExplorerPageState extends ConsumerState<DataExplorerPage> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.background,
+                          color: Theme.of(context).scaffoldBackgroundColor,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: Theme.of(context).dividerColor),
                         ),
                         child: SelectableText(
                           jsonText,
@@ -2352,9 +2350,9 @@ class _MessagePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Center(
         child: Column(

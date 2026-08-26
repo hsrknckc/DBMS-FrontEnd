@@ -181,9 +181,9 @@ class _UsersPageState extends ConsumerState<UsersPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         children: [
@@ -230,9 +230,9 @@ class _UsersPageState extends ConsumerState<UsersPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: users.isEmpty
           ? _buildEmptyState(showingDeletedUsers)
@@ -252,9 +252,7 @@ class _UsersPageState extends ConsumerState<UsersPage> {
                             minWidth: constraints.maxWidth,
                           ),
                           child: DataTable(
-                            headingRowColor: WidgetStateProperty.all(
-                              AppColors.background,
-                            ),
+                            headingRowColor: WidgetStateProperty.all(Theme.of(context).scaffoldBackgroundColor),
                             columnSpacing: 28,
                             horizontalMargin: 20,
                             dataRowMinHeight: 68,
@@ -916,9 +914,9 @@ class _UsersPageState extends ConsumerState<UsersPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.background,
+                        color: Theme.of(context).scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: Theme.of(context).dividerColor),
                       ),
                       child: const Row(
                         children: [
@@ -1171,9 +1169,9 @@ class _SummaryCard extends StatelessWidget {
       width: 220,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         children: [
@@ -1223,9 +1221,9 @@ class _DepartmentChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Text(
         label,

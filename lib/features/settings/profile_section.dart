@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/app_user.dart';
+import '../../../core/theme/app_colors.dart';
 
 class ProfileSection extends StatefulWidget {
   final AppUser? currentUser;
@@ -62,12 +63,14 @@ class _ProfileSectionState extends State<ProfileSection> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Dinamik Tema Renkleri
-    final Color boxBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final Color borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final Color titleColor = isDark ? Colors.white : const Color(0xFF1E293B);
-    final Color subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final Color inputBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final Color boxBgColor = theme.colorScheme.surface;
+    final Color borderColor = theme.dividerColor;
+    final Color titleColor =
+        isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final Color subtitleColor =
+        isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
+    final Color inputBgColor =
+        isDark ? AppColors.darkSurfaceElevated : AppColors.surfaceElevated;
 
     final userName = widget.currentUser?.name ?? 'Ahmet Yılmaz';
     final userEmail = widget.currentUser?.email ?? 'ahmet.yilmaz@company.com';
@@ -115,7 +118,8 @@ class _ProfileSectionState extends State<ProfileSection> {
                     children: [
                       CircleAvatar(
                         radius: 36,
-                        backgroundColor: const Color(0xFF4F46E5),
+                        backgroundColor:
+                            isDark ? AppColors.warning : AppColors.primary,
                         child: Text(
                           initials,
                           style: const TextStyle(
@@ -170,8 +174,12 @@ class _ProfileSectionState extends State<ProfileSection> {
                           icon: const Icon(Icons.edit_outlined, size: 16),
                           label: const Text('Düzenle'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF4F46E5),
-                            side: const BorderSide(color: Color(0xFF4F46E5)),
+                            foregroundColor:
+                                isDark ? AppColors.warning : AppColors.primary,
+                            side: BorderSide(
+                              color:
+                                  isDark ? AppColors.warning : AppColors.primary,
+                            ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),

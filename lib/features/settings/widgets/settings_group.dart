@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 
 class SettingsGroup extends StatelessWidget {
   final String title;
@@ -12,6 +13,10 @@ class SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -22,15 +27,16 @@ class SettingsGroup extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.blueAccent.shade700,
+              color: accent,
             ),
           ),
         ),
         Card(
           elevation: 0,
+          color: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: theme.dividerColor),
           ),
           child: Column(
             children: children,

@@ -216,10 +216,10 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.border,
+          color: Theme.of(context).dividerColor,
         ),
       ),
       child: LayoutBuilder(
@@ -365,10 +365,10 @@ class _DatabasesPageState extends ConsumerState<DatabasesPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.border,
+          color: Theme.of(context).dividerColor,
         ),
       ),
       child: Center(
@@ -879,10 +879,10 @@ class _DatabaseCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.border,
+          color: Theme.of(context).dividerColor,
         ),
       ),
       child: Column(
@@ -1020,10 +1020,10 @@ class _SummaryCard extends StatelessWidget {
       width: 220,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.border,
+          color: Theme.of(context).dividerColor,
         ),
       ),
       child: Row(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../main.dart';
 import '../widgets/settings_group.dart';
 
@@ -44,6 +45,13 @@ class _DatabaseSectionState extends State<DatabaseSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final subtitleColor =
+        isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
+    final accent = isDark ? AppColors.warning : AppColors.primary;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -55,9 +63,12 @@ class _DatabaseSectionState extends State<DatabaseSection> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Veritabanı & Servis Ayarları', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text('Veritabanı & Servis Ayarları', style: theme.textTheme.headlineMedium),
                   const SizedBox(height: 8),
-                  const Text('Java ara katmanı (API) ve veritabanı bağlantı limitlerini yapılandırın.', style: TextStyle(color: Colors.grey)),
+                  Text(
+                    'Java ara katmanı (API) ve veritabanı bağlantı limitlerini yapılandırın.',
+                    style: TextStyle(color: subtitleColor),
+                  ),
                 ],
               ),
               ElevatedButton.icon(
@@ -65,7 +76,7 @@ class _DatabaseSectionState extends State<DatabaseSection> {
                 icon: const Icon(Icons.save_outlined, color: Colors.white),
                 label: const Text('Kaydet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
+                  backgroundColor: accent,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -77,9 +88,12 @@ class _DatabaseSectionState extends State<DatabaseSection> {
             title: "JAVA BACKEND ENTEGRASYONU",
             children: [
               ListTile(
-                leading: const Icon(Icons.link, color: Colors.blueAccent),
-                title: const Text('API Base URL', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Java Spring Boot servis adresi'),
+                leading: Icon(Icons.link_rounded, color: accent),
+                title: Text(
+                  'API Base URL',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: titleColor),
+                ),
+                subtitle: Text('Java Spring Boot servis adresi', style: TextStyle(color: subtitleColor)),
                 trailing: SizedBox(
                   width: 300,
                   child: TextField(
@@ -99,9 +113,12 @@ class _DatabaseSectionState extends State<DatabaseSection> {
             title: "BAĞLANTI ZAMAN AŞIMI",
             children: [
               ListTile(
-                leading: const Icon(Icons.timer_outlined, color: Colors.orange),
-                title: const Text('Timeout Süresi (Saniye)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('MongoDB yanıt verme sınırı'),
+                leading: const Icon(Icons.timer_rounded, color: AppColors.warning),
+                title: Text(
+                  'Timeout Süresi (Saniye)',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: titleColor),
+                ),
+                subtitle: Text('MongoDB yanıt verme sınırı', style: TextStyle(color: subtitleColor)),
                 trailing: SizedBox(
                   width: 100,
                   child: TextField(
