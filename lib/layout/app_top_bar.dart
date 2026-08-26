@@ -224,35 +224,57 @@ class AppTopBar extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Container(
-          height: 44,
-          padding: const EdgeInsets.only(left: 5, right: 10),
+          height: 42,
+          padding: const EdgeInsets.only(left: 6, right: 12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(22),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF151922)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: Theme.of(context).dividerColor,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? 0.18
+                      : 0.045,
+                ),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 30,
+                height: 30,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: AppColors.brandGradient),
-                  shape: BoxShape.circle,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.warning.withValues(alpha: 0.14)
+                      : AppColors.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.warning.withValues(alpha: 0.34)
+                        : AppColors.primary.withValues(alpha: 0.20),
+                  ),
                 ),
                 child: Text(
                   currentUser.initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.warning
+                        : AppColors.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 11),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 150),
                 child: Text(
@@ -266,8 +288,8 @@ class AppTopBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.keyboard_arrow_down_rounded, color: subTextColor),
+              const SizedBox(width: 8),
+              Icon(Icons.expand_more_rounded, color: subTextColor, size: 19),
             ],
           ),
         ),

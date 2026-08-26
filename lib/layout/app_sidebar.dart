@@ -184,26 +184,64 @@ class _AppSidebarState extends State<AppSidebar> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? AppColors.darkBrandGradient
-                      : AppColors.brandGradient,
+                color: isDark ? const Color(0xFF151922) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.darkBorder : const Color(0xFFCAD5E1),
+                  width: 1.2,
                 ),
-                borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.24),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
+                    color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.dns_rounded,
-                color: Colors.white,
-                size: 24,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    left: 11,
+                    top: 10,
+                    child: Container(
+                      width: 24,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.warning : AppColors.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 11,
+                    top: 20,
+                    child: Container(
+                      width: 24,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.textSecondary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 11,
+                    top: 30,
+                    child: Container(
+                      width: 24,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkTextSecondary.withValues(alpha: 0.76)
+                            : AppColors.textSecondary.withValues(alpha: 0.76),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             if (!isCompact) ...[
@@ -272,18 +310,16 @@ class _AppSidebarState extends State<AppSidebar> {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.accent.withValues(alpha: 0.95),
-                    ],
+                  color: isDark ? const Color(0xFF0E1117) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? AppColors.darkBorder : const Color(0xFFCBD5E1),
                   ),
-                  shape: BoxShape.circle,
                 ),
                 child: Text(
                   widget.currentUser.initials,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isDark ? AppColors.warning : AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
