@@ -27,12 +27,14 @@ import 'socket_provider.dart';
 export 'socket_provider.dart';
 
 final dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(
-    baseUrl: 'http://localhost:8080/api/v1',
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
-    headers: {'Content-Type': 'application/json'},
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: 'http://localhost:8080/api/v1',
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: {'Content-Type': 'application/json'},
+    ),
+  );
   return dio;
 });
 
@@ -61,20 +63,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   final creds = ref.watch(credentialsProvider);
-  return TcpUserRepository(
-    ref.read(tcpSocketServiceProvider),
-    () => creds,
-  );
+  return TcpUserRepository(ref.read(tcpSocketServiceProvider), () => creds);
 });
 
 // ── Database ─────────────────────────────────────────────────────────────────
 
 final databaseRepositoryProvider = Provider<DatabaseRepository>((ref) {
   final creds = ref.watch(credentialsProvider);
-  return TcpDatabaseRepository(
-    ref.read(tcpSocketServiceProvider),
-    () => creds,
-  );
+  return TcpDatabaseRepository(ref.read(tcpSocketServiceProvider), () => creds);
 });
 
 // ── Data Explorer ─────────────────────────────────────────────────────────────
@@ -91,10 +87,7 @@ final dataExplorerRepositoryProvider = Provider<DataExplorerRepository>((ref) {
 
 final auditLogRepositoryProvider = Provider<AuditLogRepository>((ref) {
   final creds = ref.watch(credentialsProvider);
-  return TcpAuditLogRepository(
-    ref.read(tcpSocketServiceProvider),
-    () => creds,
-  );
+  return TcpAuditLogRepository(ref.read(tcpSocketServiceProvider), () => creds);
 });
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -111,9 +104,5 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
 
 final schemaRepositoryProvider = Provider<SchemaRepository>((ref) {
   final creds = ref.watch(credentialsProvider);
-  return TcpSchemaRepository(
-    ref.read(tcpSocketServiceProvider),
-    () => creds,
-  );
+  return TcpSchemaRepository(ref.read(tcpSocketServiceProvider), () => creds);
 });
-

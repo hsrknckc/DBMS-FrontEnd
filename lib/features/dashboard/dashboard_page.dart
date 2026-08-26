@@ -86,10 +86,10 @@ class _HeroPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final panelColor =
-        isDark ? const Color(0xE60E1117) : const Color(0xF7FFFFFF);
+        isDark ? Colors.white.withValues(alpha: 0.055) : const Color(0xF7FFFFFF);
     final borderColor =
-        isDark ? AppColors.darkBorder : const Color(0xFFD8E0EA);
-    final accent = isDark ? AppColors.warning : AppColors.primary;
+        isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFD8E0EA);
+    final accent = isDark ? AppColors.accent : AppColors.primary;
 
     return Container(
       decoration: BoxDecoration(
@@ -98,9 +98,10 @@ class _HeroPanel extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
-            blurRadius: 34,
-            offset: const Offset(0, 18),
+            color: (isDark ? AppColors.violet : Colors.black)
+                .withValues(alpha: isDark ? 0.16 : 0.07),
+            blurRadius: 38,
+            offset: const Offset(0, 20),
           ),
         ],
       ),
@@ -199,7 +200,7 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = isDark ? AppColors.warning : AppColors.primary;
+    final accent = isDark ? AppColors.accent : AppColors.primary;
     return Container(
       height: 104,
       padding: const EdgeInsets.all(16),
@@ -283,7 +284,7 @@ class _OperationsPanel extends StatelessWidget {
               Icon(
                 Icons.radar_rounded,
                 size: 42,
-                color: (isDark ? AppColors.warning : AppColors.primary)
+                color: (isDark ? AppColors.accent : AppColors.primary)
                     .withValues(alpha: 0.72),
               ),
               const SizedBox(height: 12),
@@ -368,19 +369,20 @@ class _PanelShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = isDark ? AppColors.warning : AppColors.primary;
+    final accent = isDark ? AppColors.accent : AppColors.primary;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xE60E1117) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? Colors.white.withValues(alpha: 0.055) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : const Color(0xFFD8E0EA),
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFD8E0EA),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.055),
-            blurRadius: 28,
+            color: (isDark ? AppColors.accent : Colors.black)
+                .withValues(alpha: isDark ? 0.12 : 0.055),
+            blurRadius: 30,
             offset: const Offset(0, 16),
           ),
         ],
@@ -503,7 +505,7 @@ class _SignalBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDark ? AppColors.warning : AppColors.accent;
+    final color = isDark ? AppColors.accent : AppColors.accent;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -548,8 +550,8 @@ class _CircuitPainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
-      ..color = (isDark ? AppColors.warning : AppColors.primary)
-          .withValues(alpha: isDark ? 0.10 : 0.07);
+      ..color = (isDark ? AppColors.accent : AppColors.primary)
+          .withValues(alpha: isDark ? 0.13 : 0.07);
 
     for (var i = 0; i < 8; i++) {
       final y = 28.0 + i * 28;
@@ -595,7 +597,7 @@ class _MiniGraphPainter extends CustomPainter {
     }
 
     final line = Paint()
-      ..color = isDark ? AppColors.warning : AppColors.primary
+      ..color = isDark ? AppColors.accent : AppColors.primary
       ..strokeWidth = 2.2
       ..style = PaintingStyle.stroke;
 

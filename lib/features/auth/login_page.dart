@@ -71,11 +71,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final accent = isDark ? AppColors.warning : AppColors.primary;
+    final accent = isDark ? AppColors.accent : AppColors.primary;
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF080A0F) : const Color(0xFFF6F8FB),
+          isDark ? const Color(0xFF050816) : const Color(0xFFF6F8FB),
       body: CustomPaint(
         painter: _LoginBackdropPainter(isDark: isDark),
         child: Center(
@@ -92,12 +92,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xF20E1117)
+                          ? Colors.white.withValues(alpha: 0.055)
                           : const Color(0xFAFFFFFF),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isDark
-                            ? AppColors.darkBorder
+                            ? Colors.white.withValues(alpha: 0.12)
                             : const Color(0xFFD9E2EC),
                       ),
                       boxShadow: [
@@ -353,7 +353,7 @@ class _BrandLockup extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
-    final accent = isDark ? AppColors.warning : AppColors.primary;
+    final accent = isDark ? AppColors.accent : AppColors.primary;
 
     return Column(
       children: [
@@ -361,14 +361,17 @@ class _BrandLockup extends StatelessWidget {
           width: 54,
           height: 54,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF10131A) : Colors.white,
+            color: isDark ? Colors.white.withValues(alpha: 0.055) : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isDark ? AppColors.darkBorder : const Color(0xFFD7E0EA),
+              color: isDark
+                  ? AppColors.accent.withValues(alpha: 0.26)
+                  : const Color(0xFFD7E0EA),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.26 : 0.07),
+                color: (isDark ? AppColors.accent : Colors.black)
+                    .withValues(alpha: isDark ? 0.12 : 0.07),
                 blurRadius: 20,
                 offset: const Offset(0, 12),
               ),
@@ -472,32 +475,27 @@ class _LoginBackdropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = (isDark ? Colors.white : const Color(0xFF64748B))
-          .withValues(alpha: isDark ? 0.035 : 0.045)
-      ..strokeWidth = 1;
+    final sweepPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          (isDark ? AppColors.accent : AppColors.primary)
+              .withValues(alpha: isDark ? 0.16 : 0.06),
+          Colors.transparent,
+          (isDark ? AppColors.violet : AppColors.accent)
+              .withValues(alpha: isDark ? 0.12 : 0.05),
+        ],
+      ).createShader(Offset.zero & size);
 
-    const step = 52.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final accent = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = (isDark ? AppColors.warning : AppColors.primary)
-          .withValues(alpha: isDark ? 0.10 : 0.055);
-
-    for (double x = -size.height; x < size.width; x += 240) {
-      canvas.drawLine(
-        Offset(x, size.height),
-        Offset(x + size.height, 0),
-        accent,
-      );
-    }
+    final sweepPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width * 0.72, 0)
+      ..lineTo(size.width, size.height * 0.78)
+      ..lineTo(size.width * 0.28, size.height)
+      ..lineTo(0, size.height * 0.36)
+      ..close();
+    canvas.drawPath(sweepPath, sweepPaint);
   }
 
   @override

@@ -28,19 +28,20 @@ class AppTopBar extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
     final subTextColor = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
-    final surface = isDark ? const Color(0xFF0D0F14) : AppColors.surface;
-    final border = isDark ? AppColors.darkBorder : AppColors.border;
+    final surface = isDark ? const Color(0xE60A1022) : AppColors.surface;
+    final border =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.border;
 
     return Container(
       height: 76,
       padding: const EdgeInsets.symmetric(horizontal: 28),
       decoration: BoxDecoration(
-        color: surface.withValues(alpha: 0.98),
+        color: surface,
         border: Border(bottom: BorderSide(color: border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.04),
-            blurRadius: 24,
+            color: Colors.black.withValues(alpha: isDark ? 0.34 : 0.04),
+            blurRadius: 28,
             offset: const Offset(0, 8),
           ),
         ],
@@ -55,7 +56,7 @@ class AppTopBar extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: theme.colorScheme.primary.withValues(alpha: 0.18),
                     ),
@@ -103,7 +104,7 @@ class AppTopBar extends StatelessWidget {
             icon: Icons.verified_user_outlined,
             label: isSuperAdminMode ? 'Super Admin' : 'User Mode',
             color: isSuperAdminMode
-                ? (isDark ? AppColors.warning : AppColors.accent)
+                ? (isDark ? AppColors.accent : AppColors.accent)
                 : AppColors.primary,
           ),
           const SizedBox(width: 10),
@@ -228,20 +229,25 @@ class AppTopBar extends StatelessWidget {
           padding: const EdgeInsets.only(left: 6, right: 12),
           decoration: BoxDecoration(
             color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF151922)
+                ? Colors.white.withValues(alpha: 0.055)
                 : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Theme.of(context).dividerColor,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Theme.of(context).dividerColor,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(
+                color: (Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.accent
+                        : Colors.black)
+                    .withValues(
                   alpha: Theme.of(context).brightness == Brightness.dark
-                      ? 0.18
+                      ? 0.10
                       : 0.045,
                 ),
-                blurRadius: 16,
+                blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
             ],
@@ -254,12 +260,12 @@ class AppTopBar extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
-                      ? AppColors.warning.withValues(alpha: 0.14)
+                      ? AppColors.accent.withValues(alpha: 0.14)
                       : AppColors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.warning.withValues(alpha: 0.34)
+                        ? AppColors.accent.withValues(alpha: 0.34)
                         : AppColors.primary.withValues(alpha: 0.20),
                   ),
                 ),
@@ -267,7 +273,7 @@ class AppTopBar extends StatelessWidget {
                   currentUser.initials,
                   style: TextStyle(
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.warning
+                        ? AppColors.accent
                         : AppColors.primary,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -367,7 +373,7 @@ class _ThemeToggle extends StatelessWidget {
         child: _TopIconButtonFrame(
           child: Icon(
             isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            color: isDark ? AppColors.warning : AppColors.textPrimary,
+            color: isDark ? AppColors.accent : AppColors.textPrimary,
           ),
         ),
       ),
@@ -388,9 +394,15 @@ class _TopIconButtonFrame extends StatelessWidget {
       height: 42,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurfaceElevated : AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.055)
+            : AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.11)
+              : Theme.of(context).dividerColor,
+        ),
       ),
       child: child,
     );
@@ -414,9 +426,9 @@ class _StatusPill extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

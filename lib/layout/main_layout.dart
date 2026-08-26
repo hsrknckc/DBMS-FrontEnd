@@ -209,9 +209,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final isDark = theme.brightness == Brightness.dark;
     final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
     final Color backgroundStart =
-        isDark ? const Color(0xFF080A0F) : const Color(0xFFF8FAFC);
+        isDark ? const Color(0xFF050816) : const Color(0xFFF7FAFF);
+    final Color backgroundMid =
+        isDark ? const Color(0xFF07132B) : const Color(0xFFEEF5FF);
     final Color backgroundEnd =
-        isDark ? const Color(0xFF141414) : const Color(0xFFEAF0F7);
+        isDark ? const Color(0xFF12091F) : const Color(0xFFEAF7FB);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -257,7 +259,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [backgroundStart, backgroundEnd],
+                        colors: [backgroundStart, backgroundMid, backgroundEnd],
+                        stops: const [0, 0.58, 1],
                       ),
                     ),
                     child: CustomPaint(
@@ -312,31 +315,44 @@ class _WorkspaceBackdropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = (isDark ? Colors.white : const Color(0xFF64748B))
-          .withValues(alpha: isDark ? 0.035 : 0.055)
-      ..strokeWidth = 1;
+    final sweepPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          (isDark ? AppColors.accent : AppColors.primary)
+              .withValues(alpha: isDark ? 0.16 : 0.06),
+          Colors.transparent,
+          (isDark ? AppColors.violet : AppColors.accent)
+              .withValues(alpha: isDark ? 0.12 : 0.05),
+        ],
+      ).createShader(Offset.zero & size);
+    final sweepPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width * 0.72, 0)
+      ..lineTo(size.width, size.height * 0.74)
+      ..lineTo(size.width * 0.34, size.height)
+      ..lineTo(0, size.height * 0.34)
+      ..close();
+    canvas.drawPath(sweepPath, sweepPaint);
 
-    const step = 44.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-    }
 
-    final diagonalPaint = Paint()
-      ..color = (isDark ? AppColors.warning : AppColors.primary)
-          .withValues(alpha: isDark ? 0.055 : 0.04)
-      ..strokeWidth = 1.2;
-
-    for (double x = -size.height; x < size.width; x += 180) {
-      canvas.drawLine(
-        Offset(x, size.height),
-        Offset(x + size.height, 0),
-        diagonalPaint,
-      );
-    }
+    final veilPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [
+          Colors.white.withValues(alpha: isDark ? 0.025 : 0.10),
+          Colors.transparent,
+        ],
+      ).createShader(Offset.zero & size);
+    final veilPath = Path()
+      ..moveTo(size.width * 0.58, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.72)
+      ..lineTo(size.width * 0.74, size.height)
+      ..close();
+    canvas.drawPath(veilPath, veilPaint);
   }
 
   @override

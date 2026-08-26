@@ -32,8 +32,8 @@ abstract final class AppTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.accent,
       brightness: Brightness.dark,
-      primary: AppColors.warning,
-      secondary: AppColors.accent,
+      primary: AppColors.accent,
+      secondary: AppColors.violet,
       surface: AppColors.darkSurface,
       error: AppColors.danger,
     );
@@ -47,7 +47,7 @@ abstract final class AppTheme {
       border: AppColors.darkBorder,
       textPrimary: AppColors.darkTextPrimary,
       textSecondary: AppColors.darkTextSecondary,
-      shadow: const Color(0x66000000),
+      shadow: const Color(0x99000000),
     );
   }
 
@@ -109,7 +109,7 @@ abstract final class AppTheme {
     );
 
     final outline = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide(color: border),
     );
 
@@ -129,7 +129,7 @@ abstract final class AppTheme {
         shadowColor: shadow,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(18),
           side: BorderSide(color: border),
         ),
       ),
@@ -151,8 +151,8 @@ abstract final class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceElevated,
-        hoverColor: scheme.primary.withValues(alpha: 0.04),
+        fillColor: isDark ? const Color(0xD9141B35) : surfaceElevated,
+        hoverColor: scheme.primary.withValues(alpha: isDark ? 0.08 : 0.04),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         hintStyle: TextStyle(color: textSecondary, fontWeight: FontWeight.w500),
         labelStyle: TextStyle(color: textSecondary, fontWeight: FontWeight.w600),
@@ -167,15 +167,16 @@ abstract final class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          elevation: 0,
+          elevation: isDark ? 8 : 0,
           backgroundColor: scheme.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: isDark ? const Color(0xFF031018) : Colors.white,
+          shadowColor: scheme.primary.withValues(alpha: 0.25),
           disabledBackgroundColor:
               isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
           disabledForegroundColor:
               isDark ? AppColors.darkTextMuted : AppColors.textMuted,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
@@ -184,14 +185,14 @@ abstract final class AppTheme {
           foregroundColor: textPrimary,
           side: BorderSide(color: border),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: scheme.primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),

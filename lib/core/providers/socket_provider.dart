@@ -5,8 +5,8 @@ import '../services/tcp_socket_service.dart';
 /// TCP Sunucu yapılandırması sağlayıcısı
 final tcpConfigProvider = Provider<TcpConfig>((ref) {
   return const TcpConfig(
-    host: '63.182.79.25', // ← AWS Ortak Sunucusu IP
-    port: 5150,            // ← Soket Portu
+    host: '127.0.0.1', // ← AWS Ortak Sunucusu IP
+    port: 5150, // ← Soket Portu
   );
 });
 

@@ -22,11 +22,11 @@ class UserProfileDialog extends StatefulWidget {
           borderRadius: BorderRadius.circular(20),
         ),
         elevation: 24,
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF0C1224) : Colors.white,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: SizedBox(
-            width: 480,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: UserProfileDialog(user: user),
           ),
         ),
@@ -62,11 +62,15 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color primaryColor = AppColors.primary;
+    final Color primaryColor = isDark ? AppColors.accent : AppColors.primary;
     final Color textColor = isDark ? Colors.white : AppColors.textPrimary;
     final Color subTextColor = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
-    final Color dividerColor = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
-    final Color cardColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final Color dividerColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : const Color(0xFFE2E8F0);
+    final Color cardColor = isDark
+        ? Colors.white.withValues(alpha: 0.045)
+        : const Color(0xFFF8FAFC);
 
     return SingleChildScrollView(
       child: Column(
@@ -76,14 +80,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
           Container(
             height: 100,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  primaryColor,
-                  primaryColor.withValues(alpha: 0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: isDark ? const Color(0xFF101A33) : primaryColor,
             ),
             child: Stack(
               clipBehavior: Clip.none,
@@ -109,7 +106,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      color: isDark ? const Color(0xFF0C1224) : Colors.white,
                       width: 5,
                     ),
                     boxShadow: [
@@ -122,7 +119,8 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                   ),
                   child: CircleAvatar(
                     radius: 45,
-                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    backgroundColor:
+                        isDark ? const Color(0xFF17213A) : const Color(0xFFE2E8F0),
                     child: Text(
                       widget.user.initials,
                       style: TextStyle(
@@ -380,16 +378,29 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 14),
         if (valueWidget != null)
-          valueWidget
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: valueWidget,
+            ),
+          )
         else if (value != null)
-          Text(
-            value,
-            style: TextStyle(
-              color: valColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+          Expanded(
+            child: Tooltip(
+              message: value,
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: valColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ),
       ],

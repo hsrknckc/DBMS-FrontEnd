@@ -99,6 +99,7 @@ class AppSidebar extends StatefulWidget {
 
 class _AppSidebarState extends State<AppSidebar> {
   bool _isHovered = false;
+  bool _showExpandedContent = false;
 
   List<NavigationItem> get _navigationItems {
     return widget.currentUser.isSuperAdmin
@@ -110,39 +111,52 @@ class _AppSidebarState extends State<AppSidebar> {
   Widget build(BuildContext context) {
     final appState = DatabaseManagementApp.of(context);
     final compactPreference = appState?.isCompactSidebar ?? false;
-    final isCompact = compactPreference && !_isHovered;
+    final isCompactWidth = compactPreference && !_isHovered;
+    final showExpandedContent = !compactPreference || _showExpandedContent;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
-    final border = isDark ? AppColors.darkBorder : AppColors.border;
+    final surface = isDark ? const Color(0xE6091022) : AppColors.surface;
+    final border =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.border;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+        Future<void>.delayed(const Duration(milliseconds: 120), () {
+          if (!mounted || !_isHovered) return;
+          setState(() => _showExpandedContent = true);
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _showExpandedContent = false;
+          _isHovered = false;
+        });
+      },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
-        width: isCompact ? 78 : 292,
+        width: isCompactWidth ? 78 : 292,
         decoration: BoxDecoration(
           color: surface,
           border: Border(right: BorderSide(color: border)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.05),
-              blurRadius: 30,
+              color: Colors.black.withValues(alpha: isDark ? 0.42 : 0.05),
+              blurRadius: 34,
               offset: const Offset(10, 0),
             ),
           ],
         ),
         child: Column(
           children: [
-            _buildLogoArea(context, isCompact),
+            _buildLogoArea(context, !showExpandedContent),
             Expanded(
               child: ListView.separated(
                 padding: EdgeInsets.fromLTRB(
-                  isCompact ? 10 : 16,
+                  isCompactWidth ? 10 : 16,
                   12,
-                  isCompact ? 10 : 16,
+                  isCompactWidth ? 10 : 16,
                   12,
                 ),
                 itemCount: _navigationItems.length,
@@ -152,13 +166,13 @@ class _AppSidebarState extends State<AppSidebar> {
                   return _SidebarMenuItem(
                     item: item,
                     isSelected: widget.selectedPage == item.page,
-                    isCompact: isCompact,
+                    isCompact: !showExpandedContent,
                     onTap: () => widget.onPageSelected(item.page),
                   );
                 },
               ),
             ),
-            _buildUserArea(context, isCompact),
+            _buildUserArea(context, !showExpandedContent),
           ],
         ),
       ),
@@ -184,17 +198,22 @@ class _AppSidebarState extends State<AppSidebar> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151922) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isDark ? AppColors.darkBorder : const Color(0xFFCAD5E1),
+                  color: isDark
+                      ? AppColors.accent.withValues(alpha: 0.26)
+                      : const Color(0xFFCAD5E1),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 10),
+                    color: (isDark ? AppColors.accent : Colors.black)
+                        .withValues(alpha: isDark ? 0.14 : 0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
@@ -208,7 +227,7 @@ class _AppSidebarState extends State<AppSidebar> {
                       width: 24,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.warning : AppColors.primary,
+                        color: isDark ? AppColors.accent : AppColors.primary,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -286,8 +305,11 @@ class _AppSidebarState extends State<AppSidebar> {
     final isDark = theme.brightness == Brightness.dark;
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
-    final panel = isDark ? AppColors.darkSurfaceElevated : AppColors.surfaceElevated;
-    final border = isDark ? AppColors.darkBorder : AppColors.border;
+    final panel = isDark
+        ? Colors.white.withValues(alpha: 0.055)
+        : AppColors.surfaceElevated;
+    final border =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.border;
 
     return Padding(
       padding: EdgeInsets.all(isCompact ? 10 : 16),
@@ -296,7 +318,7 @@ class _AppSidebarState extends State<AppSidebar> {
         decoration: BoxDecoration(
           color: panel,
           border: Border.all(color: border),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
           mainAxisAlignment:
@@ -310,16 +332,20 @@ class _AppSidebarState extends State<AppSidebar> {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0E1117) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  color: isDark
+                      ? const Color(0xFF10182F)
+                      : const Color(0xFFF8FBFF),
+                  borderRadius: BorderRadius.circular(11),
                   border: Border.all(
-                    color: isDark ? AppColors.darkBorder : const Color(0xFFCBD5E1),
+                    color: isDark
+                        ? AppColors.accent.withValues(alpha: 0.28)
+                        : const Color(0xFFCBD5E1),
                   ),
                 ),
                 child: Text(
                   widget.currentUser.initials,
                   style: TextStyle(
-                    color: isDark ? AppColors.warning : AppColors.primary,
+                    color: isDark ? AppColors.accent : AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -405,12 +431,12 @@ class _SidebarMenuItemState extends State<_SidebarMenuItem> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final activeColor = isDark ? AppColors.warning : AppColors.primary;
+    final activeColor = isDark ? AppColors.accent : AppColors.primary;
     final textColor = isDark ? AppColors.darkTextSecondary : AppColors.textSecondary;
     final selectedBg =
-        isDark ? activeColor.withValues(alpha: 0.16) : activeColor.withValues(alpha: 0.10);
+        isDark ? activeColor.withValues(alpha: 0.13) : activeColor.withValues(alpha: 0.10);
     final hoverBg =
-        isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9);
+        isDark ? Colors.white.withValues(alpha: 0.055) : const Color(0xFFF1F5F9);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -421,7 +447,7 @@ class _SidebarMenuItemState extends State<_SidebarMenuItem> {
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           color: widget.isSelected ? selectedBg : (_hovered ? hoverBg : Colors.transparent),
-          borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: widget.isSelected
                 ? activeColor.withValues(alpha: 0.24)
@@ -432,7 +458,7 @@ class _SidebarMenuItemState extends State<_SidebarMenuItem> {
           color: Colors.transparent,
           child: InkWell(
             onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             child: Tooltip(
               message: widget.isCompact ? widget.item.title : '',
               child: Padding(
@@ -454,7 +480,7 @@ class _SidebarMenuItemState extends State<_SidebarMenuItem> {
                         color: widget.isSelected
                             ? activeColor.withValues(alpha: 0.14)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         widget.item.icon,

@@ -28,8 +28,8 @@ class DatabaseManagementApp extends ConsumerStatefulWidget {
 
 class DatabaseManagementAppState
     extends ConsumerState<DatabaseManagementApp> {
-  ThemeMode _themeMode = ThemeMode.light;
-  bool _isCompactSidebar = false;
+  ThemeMode _themeMode = ThemeMode.dark;
+  bool _isCompactSidebar = true;
   String _apiBaseUrl = 'http://localhost:8080/api/v1';
   int _timeoutSeconds = 30;
 
