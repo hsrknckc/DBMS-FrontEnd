@@ -18,19 +18,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _resetEmailController = TextEditingController();
+  final _resetCodeController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmNewPasswordController = TextEditingController();
   final _resetFormKey = GlobalKey<FormState>();
+  final _resetConfirmFormKey = GlobalKey<FormState>();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _showForgotPassword = false;
   bool _isResetLoading = false;
   bool _isResetSuccess = false;
+  bool _isResetConfirmLoading = false;
+  bool _isPasswordResetCompleted = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _resetEmailController.dispose();
+    _resetCodeController.dispose();
+    _newPasswordController.dispose();
+    _confirmNewPasswordController.dispose();
     super.dispose();
   }
 
@@ -54,17 +63,66 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  void _handleResetRequest() {
+  Future<void> _handleResetRequest() async {
     if (!_resetFormKey.currentState!.validate()) return;
 
     setState(() => _isResetLoading = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
+
+    try {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .requestPasswordReset(_resetEmailController.text.trim());
+
       if (!mounted) return;
+
       setState(() {
         _isResetLoading = false;
         _isResetSuccess = true;
+        _isPasswordResetCompleted = false;
+        _resetCodeController.clear();
+        _newPasswordController.clear();
+        _confirmNewPasswordController.clear();
       });
-    });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isResetLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _handleResetConfirmation() async {
+    if (!_resetConfirmFormKey.currentState!.validate()) return;
+
+    setState(() => _isResetConfirmLoading = true);
+
+    try {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .confirmPasswordReset(
+            email: _resetEmailController.text.trim(),
+            resetCode: _resetCodeController.text.trim(),
+            newPassword: _newPasswordController.text,
+          );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isResetConfirmLoading = false;
+        _isPasswordResetCompleted = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isResetConfirmLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   @override
@@ -253,29 +311,169 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
 
     if (_isResetSuccess) {
-      return Column(
-        key: const ValueKey('reset_success'),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.mark_email_read_outlined, color: accent, size: 44),
-          const SizedBox(height: 18),
-          Text('Talep Gönderildi', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          Text(
-            'Şifre sıfırlama yönergeleri e-posta adresinize gönderildi.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () => setState(() => _showForgotPassword = false),
-              child: const Text('Giriş Ekranına Dön'),
+      if (_isPasswordResetCompleted) {
+        return Column(
+          key: const ValueKey('reset_completed'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: accent, size: 48),
+            const SizedBox(height: 18),
+            Text('Şifre Değiştirildi', style: theme.textTheme.headlineMedium),
+            const SizedBox(height: 10),
+            Text(
+              'Şifreniz başarıyla değiştirildi. Yeni şifrenizle giriş yapabilirsiniz.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _showForgotPassword = false;
+                    _isResetSuccess = false;
+                    _isPasswordResetCompleted = false;
+                    _resetEmailController.clear();
+                    _resetCodeController.clear();
+                    _newPasswordController.clear();
+                    _confirmNewPasswordController.clear();
+                  });
+                },
+                child: const Text('Giriş Ekranına Dön'),
+              ),
+            ),
+          ],
+        );
+      }
+
+      return Form(
+        key: _resetConfirmFormKey,
+        child: Column(
+          key: const ValueKey('reset_confirm'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconButton(
+              tooltip: 'Yeni kod iste',
+              onPressed: _isResetConfirmLoading
+                  ? null
+                  : () {
+                      setState(() {
+                        _isResetSuccess = false;
+                        _resetCodeController.clear();
+                        _newPasswordController.clear();
+                        _confirmNewPasswordController.clear();
+                      });
+                    },
+              icon: Icon(Icons.arrow_back_rounded, color: textColor),
+            ),
+            const SizedBox(height: 8),
+            _PanelHeader(
+              eyebrow: 'ACCOUNT RECOVERY',
+              title: 'Şifreyi Sıfırla',
+              subtitle:
+                  'Oluşturulan sıfırlama kodunu ve yeni şifrenizi girin.',
+              accent: accent,
+            ),
+            const SizedBox(height: 24),
+            _LabeledField(
+              label: 'Sıfırlama kodu',
+              child: TextFormField(
+                controller: _resetCodeController,
+                style: TextStyle(color: textColor),
+                decoration: InputDecoration(
+                  hintText: 'Sıfırlama kodunu girin',
+                  prefixIcon: Icon(Icons.key_rounded, color: muted),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Sıfırlama kodunu girin';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 18),
+            _LabeledField(
+              label: 'Yeni şifre',
+              child: TextFormField(
+                controller: _newPasswordController,
+                obscureText: true,
+                style: TextStyle(color: textColor),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  prefixIcon: Icon(Icons.lock_reset_rounded, color: muted),
+                ),
+                validator: (value) {
+                  final password = value ?? '';
+                  if (password.isEmpty) return 'Yeni şifreyi girin';
+                  if (password.length < 8) {
+                    return 'Şifre en az 8 karakter olmalı';
+                  }
+                  if (!RegExp(r'[A-Z]').hasMatch(password)) {
+                    return 'En az 1 büyük harf içermeli';
+                  }
+                  if (!RegExp(r'[a-z]').hasMatch(password)) {
+                    return 'En az 1 küçük harf içermeli';
+                  }
+                  if (!RegExp(r'[0-9]').hasMatch(password)) {
+                    return 'En az 1 rakam içermeli';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 18),
+            _LabeledField(
+              label: 'Yeni şifre tekrar',
+              child: TextFormField(
+                controller: _confirmNewPasswordController,
+                obscureText: true,
+                style: TextStyle(color: textColor),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  prefixIcon: Icon(Icons.lock_outline_rounded, color: muted),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Yeni şifreyi tekrar girin';
+                  }
+                  if (value != _newPasswordController.text) {
+                    return 'Şifreler eşleşmiyor';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 26),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed:
+                    _isResetConfirmLoading ? null : _handleResetConfirmation,
+                icon: _isResetConfirmLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.lock_reset_rounded, size: 18),
+                label: Text(
+                  _isResetConfirmLoading
+                      ? 'Değiştiriliyor'
+                      : 'Şifreyi Değiştir',
+                ),
+                style: ElevatedButton.styleFrom(backgroundColor: accent),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -288,14 +486,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         children: [
           IconButton(
             tooltip: 'Geri dön',
-            onPressed: () => setState(() => _showForgotPassword = false),
+            onPressed: () {
+              setState(() {
+                _showForgotPassword = false;
+                _isResetSuccess = false;
+                _isPasswordResetCompleted = false;
+              });
+            },
             icon: Icon(Icons.arrow_back_rounded, color: textColor),
           ),
           const SizedBox(height: 8),
           _PanelHeader(
             eyebrow: 'ACCOUNT RECOVERY',
             title: 'Şifre Talebi',
-            subtitle: 'Kayıtlı e-posta adresinizle sıfırlama talebi oluşturun.',
+            subtitle:
+                'Kayıtlı e-posta adresinizle sıfırlama talebi oluşturun.',
             accent: accent,
           ),
           const SizedBox(height: 24),
@@ -310,10 +515,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 prefixIcon: Icon(Icons.alternate_email_rounded, color: muted),
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
+                final email = value?.trim() ?? '';
+                if (email.isEmpty) {
                   return 'E-posta adresi boş bırakılamaz';
                 }
-                if (!value.contains('@')) return 'Geçersiz e-posta formatı';
+                if (!email.contains('@')) return 'Geçersiz e-posta formatı';
                 return null;
               },
             ),
@@ -334,7 +540,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     )
                   : const Icon(Icons.send_rounded, size: 18),
-              label: Text(_isResetLoading ? 'Gönderiliyor' : 'Talebi Gönder'),
+              label: Text(
+                _isResetLoading ? 'Gönderiliyor' : 'Sıfırlama Kodu İste',
+              ),
               style: ElevatedButton.styleFrom(backgroundColor: accent),
             ),
           ),
@@ -342,6 +550,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       ),
     );
   }
+
 }
 
 class _BrandLockup extends StatelessWidget {
