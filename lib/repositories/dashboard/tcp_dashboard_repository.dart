@@ -86,8 +86,8 @@ class TcpDashboardRepository implements DashboardRepository {
     }
 
     return SystemStatus(
-      isMongoConnected: true,
-      isApiOnline: true,
+      isMongoConnected: false,
+      isApiOnline: false,
       lastCheckedAt: DateTime.now(),
     );
   }

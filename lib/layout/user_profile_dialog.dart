@@ -267,13 +267,13 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
         ),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.check_circle,
               color: AppColors.success,
               size: 40,
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Talep Başarıyla İletildi',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
@@ -301,7 +301,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
-            const SizedBox(
+            SizedBox(
               width: 32,
               height: 32,
               child: CircularProgressIndicator(

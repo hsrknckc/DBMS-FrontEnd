@@ -48,10 +48,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(authNotifierProvider.notifier).login(
-            _emailController.text.trim(),
-            _passwordController.text,
-          );
+      await ref
+          .read(authNotifierProvider.notifier)
+          .login(_emailController.text.trim(), _passwordController.text);
       widget.onLoginSuccess();
     } catch (e) {
       if (!mounted) return;
@@ -132,8 +131,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final accent = isDark ? AppColors.accent : AppColors.primary;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF050816) : const Color(0xFFF6F8FB),
+      backgroundColor: isDark
+          ? const Color(0xFF050816)
+          : const Color(0xFFF6F8FB),
       body: CustomPaint(
         painter: _LoginBackdropPainter(isDark: isDark),
         child: Center(
@@ -199,7 +199,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget _buildLoginView(BuildContext context, Color accent) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final textColor = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.textPrimary;
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
 
     return Form(
@@ -307,7 +309,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget _buildForgotPasswordView(BuildContext context, Color accent) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final textColor = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.textPrimary;
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
 
     if (_isResetSuccess) {
@@ -373,8 +377,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             _PanelHeader(
               eyebrow: 'ACCOUNT RECOVERY',
               title: 'Şifreyi Sıfırla',
-              subtitle:
-                  'Oluşturulan sıfırlama kodunu ve yeni şifrenizi girin.',
+              subtitle: 'Oluşturulan sıfırlama kodunu ve yeni şifrenizi girin.',
               accent: accent,
             ),
             const SizedBox(height: 24),
@@ -452,8 +455,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed:
-                    _isResetConfirmLoading ? null : _handleResetConfirmation,
+                onPressed: _isResetConfirmLoading
+                    ? null
+                    : _handleResetConfirmation,
                 icon: _isResetConfirmLoading
                     ? const SizedBox(
                         width: 18,
@@ -499,8 +503,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           _PanelHeader(
             eyebrow: 'ACCOUNT RECOVERY',
             title: 'Şifre Talebi',
-            subtitle:
-                'Kayıtlı e-posta adresinizle sıfırlama talebi oluşturun.',
+            subtitle: 'Kayıtlı e-posta adresinizle sıfırlama talebi oluşturun.',
             accent: accent,
           ),
           const SizedBox(height: 24),
@@ -550,7 +553,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       ),
     );
   }
-
 }
 
 class _BrandLockup extends StatelessWidget {
@@ -560,7 +562,9 @@ class _BrandLockup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final textColor = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.textPrimary;
     final muted = isDark ? AppColors.darkTextMuted : AppColors.textSecondary;
     final accent = isDark ? AppColors.accent : AppColors.primary;
 
@@ -570,7 +574,9 @@ class _BrandLockup extends StatelessWidget {
           width: 54,
           height: 54,
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.055) : Colors.white,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.055)
+                : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isDark
@@ -579,8 +585,9 @@ class _BrandLockup extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: (isDark ? AppColors.accent : Colors.black)
-                    .withValues(alpha: isDark ? 0.12 : 0.07),
+                color: (isDark ? AppColors.accent : Colors.black).withValues(
+                  alpha: isDark ? 0.12 : 0.07,
+                ),
                 blurRadius: 20,
                 offset: const Offset(0, 12),
               ),
@@ -666,10 +673,7 @@ class _LabeledField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         child,
       ],
@@ -689,11 +693,13 @@ class _LoginBackdropPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          (isDark ? AppColors.accent : AppColors.primary)
-              .withValues(alpha: isDark ? 0.16 : 0.06),
+          (isDark ? AppColors.accent : AppColors.primary).withValues(
+            alpha: isDark ? 0.16 : 0.06,
+          ),
           Colors.transparent,
-          (isDark ? AppColors.violet : AppColors.accent)
-              .withValues(alpha: isDark ? 0.12 : 0.05),
+          (isDark ? AppColors.violet : AppColors.accent).withValues(
+            alpha: isDark ? 0.12 : 0.05,
+          ),
         ],
       ).createShader(Offset.zero & size);
 

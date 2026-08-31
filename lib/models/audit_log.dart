@@ -8,6 +8,10 @@ enum AuditAction {
   permissionsUpdated,
   permissionsReverted,
   passwordResetRequested,
+  passwordResetConfirmed,
+  passwordResetApprovalRequired,
+  passwordResetApproved,
+  passwordResetByAdmin,
   dataExported,
   databaseCreated,
 }
@@ -32,7 +36,15 @@ extension AuditActionExtension on AuditAction {
       case AuditAction.permissionsReverted:
         return 'Yetkiler Geri Alındı';
       case AuditAction.passwordResetRequested:
-        return 'Şifre Sıfırlama İstendi';
+        return 'Şifre Değişikliği Talep Edildi';
+      case AuditAction.passwordResetConfirmed:
+        return 'Şifre Değiştirildi';
+      case AuditAction.passwordResetApprovalRequired:
+        return 'Şifre Onayı Bekliyor';
+      case AuditAction.passwordResetApproved:
+        return 'Şifre Değişikliği Onaylandı';
+      case AuditAction.passwordResetByAdmin:
+        return 'Şifre Admin Tarafından Sıfırlandı';
       case AuditAction.dataExported:
         return 'Veri Dışa Aktarıldı';
       case AuditAction.databaseCreated:
@@ -60,6 +72,14 @@ extension AuditActionExtension on AuditAction {
         return 'PERMISSIONS_REVERTED';
       case AuditAction.passwordResetRequested:
         return 'PASSWORD_RESET_REQUESTED';
+      case AuditAction.passwordResetConfirmed:
+        return 'PASSWORD_RESET_CONFIRMED';
+      case AuditAction.passwordResetApprovalRequired:
+        return 'PASSWORD_RESET_APPROVAL_REQUIRED';
+      case AuditAction.passwordResetApproved:
+        return 'PASSWORD_RESET_APPROVED';
+      case AuditAction.passwordResetByAdmin:
+        return 'PASSWORD_RESET_BY_ADMIN';
       case AuditAction.dataExported:
         return 'DATA_EXPORTED';
       case AuditAction.databaseCreated:
@@ -68,10 +88,58 @@ extension AuditActionExtension on AuditAction {
   }
 
   static AuditAction fromCode(String code) {
-    return AuditAction.values.firstWhere(
-      (a) => a.code == code,
-      orElse: () => AuditAction.userUpdated,
-    );
+    switch (code.trim()) {
+      case 'USER_CREATED':
+      case 'userCreated':
+        return AuditAction.userCreated;
+      case 'USER_UPDATED':
+      case 'userUpdated':
+        return AuditAction.userUpdated;
+      case 'USER_STATUS_CHANGED':
+      case 'userStatusChanged':
+        return AuditAction.userStatusChanged;
+      case 'USER_SOFT_DELETED':
+      case 'userSoftDeleted':
+        return AuditAction.userSoftDeleted;
+      case 'USER_RESTORED':
+      case 'userRestored':
+        return AuditAction.userRestored;
+      case 'USER_PERMANENTLY_DELETED':
+      case 'userPermanentlyDeleted':
+        return AuditAction.userPermanentlyDeleted;
+      case 'PERMISSIONS_UPDATED':
+      case 'permissionsUpdated':
+        return AuditAction.permissionsUpdated;
+      case 'PERMISSIONS_REVERTED':
+      case 'permissionsReverted':
+        return AuditAction.permissionsReverted;
+      case 'PASSWORD_RESET_REQUESTED':
+      case 'passwordResetRequested':
+        return AuditAction.passwordResetRequested;
+      case 'PASSWORD_RESET_CONFIRMED':
+      case 'passwordResetCompleted':
+      case 'passwordResetConfirmed':
+        return AuditAction.passwordResetConfirmed;
+      case 'PASSWORD_RESET_APPROVAL_REQUIRED':
+      case 'passwordResetAdminApprovalRequired':
+      case 'passwordResetApprovalRequired':
+        return AuditAction.passwordResetApprovalRequired;
+      case 'PASSWORD_RESET_APPROVED':
+      case 'passwordResetAdminApproved':
+      case 'passwordResetApproved':
+        return AuditAction.passwordResetApproved;
+      case 'PASSWORD_RESET_BY_ADMIN':
+      case 'passwordResetByAdmin':
+        return AuditAction.passwordResetByAdmin;
+      case 'DATA_EXPORTED':
+      case 'dataExported':
+        return AuditAction.dataExported;
+      case 'DATABASE_CREATED':
+      case 'databaseCreated':
+        return AuditAction.databaseCreated;
+      default:
+        return AuditAction.userUpdated;
+    }
   }
 }
 
@@ -117,6 +185,8 @@ class AuditLog {
 
   /// MongoDB dökümanından oluştur. `_id` → `id` dönüşümü dahil.
   factory AuditLog.fromJson(Map<String, dynamic> json) {
+    final rawCreatedAt = json['createdAt'] ?? json['occurredAt'];
+
     return AuditLog(
       id: (json['_id'] ?? json['id'] ?? '') as String,
       action: AuditActionExtension.fromCode(json['action'] as String? ?? ''),
@@ -124,14 +194,16 @@ class AuditLog {
       performedByName: json['performedByName'] as String? ?? '',
       targetUserId: json['targetUserId'] as String?,
       targetUserName: json['targetUserName'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+      createdAt: rawCreatedAt != null
+          ? DateTime.parse(rawCreatedAt as String)
           : DateTime.now(),
       description: json['description'] as String? ?? '',
-      oldValues:
-          (json['oldValues'] as Map<String, dynamic>?) ?? const {},
-      newValues:
-          (json['newValues'] as Map<String, dynamic>?) ?? const {},
+      oldValues: json['oldValues'] is Map
+          ? Map<String, dynamic>.from(json['oldValues'] as Map)
+          : const {},
+      newValues: json['newValues'] is Map
+          ? Map<String, dynamic>.from(json['newValues'] as Map)
+          : const {},
       isReverted: json['isReverted'] as bool? ?? false,
       revertedAt: json['revertedAt'] != null
           ? DateTime.parse(json['revertedAt'] as String)

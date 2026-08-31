@@ -11,7 +11,6 @@ import '../core/theme/app_colors.dart';
 import '../models/app_user.dart';
 import '../models/navigation_item.dart';
 
-
 import 'app_sidebar.dart';
 import 'app_top_bar.dart';
 import 'user_profile_dialog.dart';
@@ -69,7 +68,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom, // Klavyenin üstüne taşır
+            bottom: MediaQuery.of(
+              context,
+            ).viewInsets.bottom, // Klavyenin üstüne taşır
             left: 24,
             right: 24,
             top: 24,
@@ -89,20 +90,28 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               const SizedBox(height: 20),
               TextField(
                 controller: nameController,
-                style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Ad Soyad',
-                  labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                  labelStyle: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
                   border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: emailController,
-                style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
                 decoration: InputDecoration(
                   labelText: 'E-posta',
-                  labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                  labelStyle: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -112,7 +121,10 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('İptal', style: TextStyle(color: AppColors.danger)),
+                    child: const Text(
+                      'İptal',
+                      style: TextStyle(color: AppColors.danger),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
@@ -129,8 +141,13 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                         ),
                       );
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                    child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    child: const Text(
+                      'Kaydet',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
               ),
@@ -188,32 +205,39 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 900;
-    
+
     // Auth provider'dan mevcut kullanıcıyı dinliyoruz
     final userAsync = ref.watch(authNotifierProvider);
     final user = userAsync.valueOrNull;
 
     // Eğer henüz yüklenmemişse geçici boş bir model oluştur veya bekle
-    final displayUser = user ?? const AppUser(
-      id: '0', 
-      name: 'Yükleniyor...', 
-      email: '', 
-      role: UserRole.superAdmin, 
-      departments: {}, 
-      permissions: {}, 
-      isActive: true,
-    );
+    final displayUser =
+        user ??
+        const AppUser(
+          id: '0',
+          name: 'Yükleniyor...',
+          email: '',
+          role: UserRole.superAdmin,
+          departments: {},
+          permissions: {},
+          isActive: true,
+        );
     _currentUser = displayUser;
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
-    final Color backgroundStart =
-        isDark ? const Color(0xFF050816) : const Color(0xFFF7FAFF);
-    final Color backgroundMid =
-        isDark ? const Color(0xFF07132B) : const Color(0xFFEEF5FF);
-    final Color backgroundEnd =
-        isDark ? const Color(0xFF12091F) : const Color(0xFFEAF7FB);
+    final Color textColor = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.textPrimary;
+    final Color backgroundStart = isDark
+        ? const Color(0xFF050816)
+        : const Color(0xFFF7FAFF);
+    final Color backgroundMid = isDark
+        ? const Color(0xFF07132B)
+        : const Color(0xFFEEF5FF);
+    final Color backgroundEnd = isDark
+        ? const Color(0xFF12091F)
+        : const Color(0xFFEAF7FB);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -226,7 +250,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             currentUser: _currentUser,
             // Buraya tetikleyicileri ekledik. app_sidebar.dart dosyasında constructor'a ekleyebilirsin:
             // final VoidCallback? onProfilePressed; gibi.
-            onProfilePressed: () => _showEditProfileBottomSheet(context, isDark),
+            onProfilePressed: () =>
+                _showEditProfileBottomSheet(context, isDark),
             onLogoPressed: () {
               // Logo/Sol üst tıklandığında istersen menüyü daraltabilir ya da dashboard'a yollayabilirsin:
               _changePage(AppPage.dashboard);
@@ -242,7 +267,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   isSuperAdminMode: _showSuperAdmin,
                   onRoleChanged: _changeRole,
                   currentUser: _currentUser,
-                  onProfilePressed: () => UserProfileDialog.show(context, _currentUser),
+                  onProfilePressed: () =>
+                      UserProfileDialog.show(context, _currentUser),
                   onLogoutPressed: () {
                     LogoutConfirmationDialog.show(
                       context,
@@ -320,11 +346,13 @@ class _WorkspaceBackdropPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          (isDark ? AppColors.accent : AppColors.primary)
-              .withValues(alpha: isDark ? 0.16 : 0.06),
+          (isDark ? AppColors.accent : AppColors.primary).withValues(
+            alpha: isDark ? 0.16 : 0.06,
+          ),
           Colors.transparent,
-          (isDark ? AppColors.violet : AppColors.accent)
-              .withValues(alpha: isDark ? 0.12 : 0.05),
+          (isDark ? AppColors.violet : AppColors.accent).withValues(
+            alpha: isDark ? 0.12 : 0.05,
+          ),
         ],
       ).createShader(Offset.zero & size);
     final sweepPath = Path()
@@ -335,7 +363,6 @@ class _WorkspaceBackdropPainter extends CustomPainter {
       ..lineTo(0, size.height * 0.34)
       ..close();
     canvas.drawPath(sweepPath, sweepPaint);
-
 
     final veilPaint = Paint()
       ..shader = LinearGradient(

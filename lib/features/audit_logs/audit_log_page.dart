@@ -1,105 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/audit_log.dart';
+import 'controllers/audit_log_notifier.dart';
 
-class AuditLogsPage extends StatefulWidget {
+class AuditLogsPage extends ConsumerStatefulWidget {
   const AuditLogsPage({super.key});
 
   @override
-  State<AuditLogsPage> createState() => _AuditLogsPageState();
+  ConsumerState<AuditLogsPage> createState() => _AuditLogsPageState();
 }
 
-class _AuditLogsPageState extends State<AuditLogsPage> {
+class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
   final TextEditingController _searchController = TextEditingController();
 
   AuditAction? _selectedAction;
   bool _showOnlyRevertible = false;
 
-  final List<AuditLog> _logs = [
-    AuditLog(
-      id: 'log-1',
-      action: AuditAction.permissionsUpdated,
-      performedById: 'super-admin-1',
-      performedByName: 'Ayşe Yılmaz',
-      targetUserId: 'user-1',
-      targetUserName: 'Mehmet Kaya',
-      createdAt: DateTime(2026, 7, 15, 14, 40),
-      description:
-          'Mehmet Kaya kullanıcısının departman ve işlem yetkileri güncellendi.',
-      oldValues: {
-        'Departmanlar': ['Sensor'],
-        'Yetkiler': ['Database görüntüleme', 'Veri görüntüleme'],
-      },
-      newValues: {
-        'Departmanlar': ['Sensor', 'Signal'],
-        'Yetkiler': [
-          'Database görüntüleme',
-          'Veri görüntüleme',
-          'Veri dışa aktarma',
-        ],
-      },
-    ),
-    AuditLog(
-      id: 'log-2',
-      action: AuditAction.userSoftDeleted,
-      performedById: 'super-admin-1',
-      performedByName: 'Ayşe Yılmaz',
-      targetUserId: 'user-3',
-      targetUserName: 'Ahmet Yıldız',
-      createdAt: DateTime(2026, 7, 15, 13, 20),
-      description: 'Ahmet Yıldız silinen kullanıcılar bölümüne taşındı.',
-      oldValues: {'Silindi': false, 'Aktif': true},
-      newValues: {'Silindi': true, 'Aktif': false},
-    ),
-    AuditLog(
-      id: 'log-3',
-      action: AuditAction.passwordResetRequested,
-      performedById: 'super-admin-1',
-      performedByName: 'Ayşe Yılmaz',
-      targetUserId: 'user-2',
-      targetUserName: 'Zeynep Demir',
-      createdAt: DateTime(2026, 7, 15, 11, 15),
-      description: 'Zeynep Demir için şifre yenileme anahtarı oluşturuldu.',
-    ),
-    AuditLog(
-      id: 'log-4',
-      action: AuditAction.userStatusChanged,
-      performedById: 'super-admin-1',
-      performedByName: 'Ayşe Yılmaz',
-      targetUserId: 'user-4',
-      targetUserName: 'Elif Arslan',
-      createdAt: DateTime(2026, 7, 14, 16, 50),
-      description: 'Elif Arslan kullanıcısı pasif duruma getirildi.',
-      oldValues: {'Aktif': true},
-      newValues: {'Aktif': false},
-    ),
-    AuditLog(
-      id: 'log-5',
-      action: AuditAction.dataExported,
-      performedById: 'user-1',
-      performedByName: 'Mehmet Kaya',
-      targetUserId: 'user-1',
-      targetUserName: 'Mehmet Kaya',
-      createdAt: DateTime(2026, 7, 14, 15, 10),
-      description: 'Signal departmanındaki veriler CSV olarak dışa aktarıldı.',
-      newValues: {'Format': 'CSV', 'Departman': 'Signal', 'Kayıt sayısı': 1240},
-    ),
-    AuditLog(
-      id: 'log-6',
-      action: AuditAction.databaseCreated,
-      performedById: 'super-admin-1',
-      performedByName: 'Ayşe Yılmaz',
-      createdAt: DateTime(2026, 7, 14, 10, 30),
-      description: 'sensor_archive isimli yeni bir database oluşturuldu.',
-      newValues: {'Database adı': 'sensor_archive', 'Departman': 'Sensor'},
-    ),
-  ];
-
-  List<AuditLog> get _filteredLogs {
+  List<AuditLog> _filteredLogs(List<AuditLog> logs) {
     final query = _searchController.text.trim().toLowerCase();
 
-    final filteredLogs = _logs.where((log) {
+    final filteredLogs = logs.where((log) {
       final matchesSearch =
           query.isEmpty ||
           log.description.toLowerCase().contains(query) ||
@@ -129,19 +51,53 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredLogs = _filteredLogs;
+    final logsAsync = ref.watch(auditLogProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(),
-        const SizedBox(height: 20),
-        _buildSummaryCards(),
-        const SizedBox(height: 18),
-        _buildFilters(),
-        const SizedBox(height: 16),
-        Expanded(child: _buildLogList(filteredLogs)),
-      ],
+    return logsAsync.when(
+      data: (logs) {
+        final filteredLogs = _filteredLogs(logs);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildSummaryCards(logs),
+            const SizedBox(height: 18),
+            _buildFilters(),
+            const SizedBox(height: 16),
+            Expanded(child: _buildLogList(filteredLogs)),
+          ],
+        );
+      },
+      loading: () {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildSummaryCards(const []),
+            const SizedBox(height: 18),
+            _buildFilters(),
+            const SizedBox(height: 16),
+            const Expanded(child: Center(child: CircularProgressIndicator())),
+          ],
+        );
+      },
+      error: (error, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildSummaryCards(const []),
+            const SizedBox(height: 18),
+            _buildFilters(),
+            const SizedBox(height: 16),
+            Expanded(child: _buildErrorState(error)),
+          ],
+        );
+      },
     );
   }
 
@@ -159,10 +115,10 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
     );
   }
 
-  Widget _buildSummaryCards() {
-    final revertibleCount = _logs.where((log) => log.canBeReverted).length;
+  Widget _buildSummaryCards(List<AuditLog> logs) {
+    final revertibleCount = logs.where((log) => log.canBeReverted).length;
 
-    final revertedCount = _logs.where((log) => log.isReverted).length;
+    final revertedCount = logs.where((log) => log.isReverted).length;
 
     return Wrap(
       spacing: 16,
@@ -170,7 +126,7 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       children: [
         _SummaryCard(
           title: 'Toplam İşlem',
-          value: _logs.length.toString(),
+          value: logs.length.toString(),
           icon: Icons.history_outlined,
         ),
         _SummaryCard(
@@ -326,6 +282,59 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
           itemBuilder: (context, index) {
             return _buildLogItem(logs[index]);
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 46,
+                color: AppColors.danger,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'İşlem kayıtları alınamadı',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.invalidate(auditLogProvider);
+                },
+                icon: const Icon(Icons.refresh_outlined),
+                label: const Text('Tekrar dene'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -587,37 +596,18 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
       return;
     }
 
-    final index = _logs.indexWhere((item) => item.id == log.id);
+    try {
+      await ref.read(auditLogProvider.notifier).revert(log.id);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
 
-    if (index == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Geri alma başarısız: $error')),
+      );
       return;
     }
-
-    final revertedAt = DateTime.now();
-
-    setState(() {
-      _logs[index] = log.copyWith(
-        isReverted: true,
-        revertedAt: revertedAt,
-        revertedByName: 'Ayşe Yılmaz',
-      );
-
-      _logs.insert(
-        0,
-        AuditLog(
-          id: revertedAt.millisecondsSinceEpoch.toString(),
-          action: AuditAction.permissionsReverted,
-          performedById: 'super-admin-1',
-          performedByName: 'Ayşe Yılmaz',
-          targetUserId: log.targetUserId,
-          targetUserName: log.targetUserName,
-          createdAt: revertedAt,
-          description: '${log.action.label} işlemi geri alındı.',
-          oldValues: log.newValues,
-          newValues: log.oldValues,
-        ),
-      );
-    });
 
     if (!mounted) {
       return;
@@ -747,6 +737,22 @@ class _ActionIcon extends StatelessWidget {
 
       case AuditAction.passwordResetRequested:
         icon = Icons.key_outlined;
+        break;
+
+      case AuditAction.passwordResetConfirmed:
+        icon = Icons.password_outlined;
+        break;
+
+      case AuditAction.passwordResetApprovalRequired:
+        icon = Icons.lock_clock_outlined;
+        break;
+
+      case AuditAction.passwordResetApproved:
+        icon = Icons.verified_user_outlined;
+        break;
+
+      case AuditAction.passwordResetByAdmin:
+        icon = Icons.admin_panel_settings_outlined;
         break;
 
       case AuditAction.dataExported:

@@ -5,8 +5,6 @@ import 'controllers/dashboard_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/app_user.dart';
 import '../../models/dashboard_stats.dart';
-import '../databases/controllers/databases_notifier.dart';
-import '../users/controllers/users_notifier.dart';
 
 class DashboardPage extends ConsumerWidget {
   final AppUser? currentUser;
@@ -17,27 +15,30 @@ class DashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final dbs = ref.watch(databasesProvider).valueOrNull ?? [];
-    final users = ref.watch(usersProvider).valueOrNull ?? [];
+    final dashboardStats = ref.watch(dashboardStatsProvider).valueOrNull;
     final systemStatus = ref.watch(systemStatusProvider);
 
-    var totalCollections = 0;
-    var totalRecords = 0;
-    for (final db in dbs) {
-      totalCollections += db.collectionCount;
-      totalRecords += db.recordCount;
-    }
-
-    final activeUsers = users.where((user) => user.isActive).length;
     final stats = [
-      _StatItem('Databases', dbs.length.toString(), Icons.dns_rounded),
+      _StatItem(
+        'Databases',
+        (dashboardStats?.totalDatabases ?? 0).toString(),
+        Icons.dns_rounded,
+      ),
       _StatItem(
         'Collections',
-        totalCollections.toString(),
+        (dashboardStats?.totalCollections ?? 0).toString(),
         Icons.folder_rounded,
       ),
-      _StatItem('Records', totalRecords.toString(), Icons.view_list_rounded),
-      _StatItem('Active Users', activeUsers.toString(), Icons.groups_rounded),
+      _StatItem(
+        'Records',
+        (dashboardStats?.totalRecords ?? 0).toString(),
+        Icons.view_list_rounded,
+      ),
+      _StatItem(
+        'Active Users',
+        (dashboardStats?.activeUsers ?? 0).toString(),
+        Icons.groups_rounded,
+      ),
     ];
 
     return SingleChildScrollView(
