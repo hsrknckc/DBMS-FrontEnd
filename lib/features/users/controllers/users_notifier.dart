@@ -37,15 +37,14 @@ class UsersNotifier extends AsyncNotifier<List<AppUser>> {
           departments: departments,
           permissions: permissions,
         );
-    state = AsyncData([...state.value ?? [], newUser]);
+    final current = state.value ?? const <AppUser>[];
+    state = AsyncData(_upsertUser(current, newUser));
   }
 
   Future<void> updateUser(AppUser user) async {
     final updated = await ref.read(userRepositoryProvider).updateUser(user);
     state = AsyncData(
-      (state.value ?? [])
-          .map((u) => u.id == updated.id ? updated : u)
-          .toList(),
+      _upsertUser(state.value ?? const <AppUser>[], updated),
     );
   }
 
@@ -81,17 +80,59 @@ class UsersNotifier extends AsyncNotifier<List<AppUser>> {
           allowedCollections: allowedCollections,
           databasePermissions: databasePermissions,
           collectionPermissions: collectionPermissions,
-        );
+    );
     state = AsyncData(
-      (state.value ?? [])
-          .map((u) => u.id == updated.id ? updated : u)
-          .toList(),
+      _upsertUser(state.value ?? const <AppUser>[], updated),
     );
   }
 
   Future<void> forcePasswordReset(String userId) async {
     await ref.read(userRepositoryProvider).forcePasswordReset(userId);
     await refresh();
+  }
+
+  List<AppUser> _upsertUser(List<AppUser> users, AppUser updated) {
+    var replaced = false;
+    final next = users.map((user) {
+      if (_sameUser(user, updated)) {
+        replaced = true;
+        return updated;
+      }
+      return user;
+    }).toList();
+
+    if (!replaced) {
+      next.add(updated);
+    }
+
+    return _dedupeUsers(next);
+  }
+
+  List<AppUser> _dedupeUsers(Iterable<AppUser> users) {
+    final result = <AppUser>[];
+    for (final user in users) {
+      final index = result.indexWhere((item) => _sameUser(item, user));
+      if (index == -1) {
+        result.add(user);
+      } else {
+        result[index] = user;
+      }
+    }
+    return result;
+  }
+
+  bool _sameUser(AppUser first, AppUser second) {
+    final firstId = first.id.trim();
+    final secondId = second.id.trim();
+    if (firstId.isNotEmpty && secondId.isNotEmpty && firstId == secondId) {
+      return true;
+    }
+
+    final firstEmail = first.email.trim().toLowerCase();
+    final secondEmail = second.email.trim().toLowerCase();
+    return firstEmail.isNotEmpty &&
+        secondEmail.isNotEmpty &&
+        firstEmail == secondEmail;
   }
 }
 

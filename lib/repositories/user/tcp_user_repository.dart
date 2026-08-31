@@ -47,13 +47,13 @@ class TcpUserRepository implements UserRepository {
           );
         }).toList();
 
-        _localUsers.clear();
-        _localUsers.addAll(fetched);
+        _replaceLocalUsers(fetched);
       }
     } catch (_) {}
 
-    if (includeDeleted) return _localUsers;
-    return _localUsers.where((u) => u.isActive).toList();
+    final users = _dedupeUsers(_localUsers);
+    if (includeDeleted) return users;
+    return users.where((u) => u.isActive).toList();
   }
 
   @override
@@ -133,7 +133,7 @@ class TcpUserRepository implements UserRepository {
       );
     }
 
-    _localUsers.add(newU);
+    _upsertLocalUser(newU);
     return newU;
   }
 
@@ -232,7 +232,7 @@ class TcpUserRepository implements UserRepository {
     );
 
     AppUser updated;
-    if (index != -1) {
+      if (index != -1) {
       updated = _localUsers[index].copyWith(
         departments: departments,
         allowedCollections: allowedCollections,
@@ -240,7 +240,7 @@ class TcpUserRepository implements UserRepository {
         databasePermissions: databasePermissions,
         collectionPermissions: collectionPermissions,
       );
-      _localUsers[index] = updated;
+      _upsertLocalUser(updated);
     } else {
       updated = AppUser(
         id: userId,
@@ -254,7 +254,7 @@ class TcpUserRepository implements UserRepository {
         collectionPermissions: collectionPermissions,
         isActive: true,
       );
-      _localUsers.add(updated);
+      _upsertLocalUser(updated);
     }
 
     return updated;
@@ -366,4 +366,46 @@ class TcpUserRepository implements UserRepository {
     ),
     'isActive': user.isActive,
   };
+
+  void _replaceLocalUsers(List<AppUser> users) {
+    _localUsers
+      ..clear()
+      ..addAll(_dedupeUsers(users));
+  }
+
+  void _upsertLocalUser(AppUser user) {
+    final index = _localUsers.indexWhere((item) => _sameUser(item, user));
+    if (index == -1) {
+      _localUsers.add(user);
+    } else {
+      _localUsers[index] = user;
+    }
+  }
+
+  List<AppUser> _dedupeUsers(Iterable<AppUser> users) {
+    final result = <AppUser>[];
+    for (final user in users) {
+      final index = result.indexWhere((item) => _sameUser(item, user));
+      if (index == -1) {
+        result.add(user);
+      } else {
+        result[index] = user;
+      }
+    }
+    return result;
+  }
+
+  bool _sameUser(AppUser first, AppUser second) {
+    final firstId = first.id.trim();
+    final secondId = second.id.trim();
+    if (firstId.isNotEmpty && secondId.isNotEmpty && firstId == secondId) {
+      return true;
+    }
+
+    final firstEmail = first.email.trim().toLowerCase();
+    final secondEmail = second.email.trim().toLowerCase();
+    return firstEmail.isNotEmpty &&
+        secondEmail.isNotEmpty &&
+        firstEmail == secondEmail;
+  }
 }

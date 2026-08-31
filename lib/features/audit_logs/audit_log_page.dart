@@ -487,12 +487,12 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
                   ),
                   if (log.oldValues.isNotEmpty) ...[
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Eski Değerler',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -500,12 +500,12 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
                   ],
                   if (log.newValues.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    const Text(
+                    Text(
                       'Yeni Değerler',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -968,10 +968,21 @@ class _ValuesCard extends StatelessWidget {
   }
 
   String _formatValue(dynamic value) {
+    String text;
     if (value is List) {
-      return value.join(', ');
+      text = value.join(', ');
+    } else if (value is Map) {
+      text = value.entries
+          .map((entry) => '${entry.key}: ${entry.value}')
+          .join(', ');
+    } else {
+      text = value.toString();
     }
 
-    return value.toString();
+    const maxLength = 500;
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return '${text.substring(0, maxLength)}...';
   }
 }
